@@ -73,7 +73,13 @@ class QueryEngine:
 
         conn.close()
 
+        # Replace NaN/NaT with None for JSON serialization
+        import math
         results = result_df.to_dict("records")
+        for row in results:
+            for k, v in row.items():
+                if isinstance(v, float) and math.isnan(v):
+                    row[k] = None
         execution_time = (datetime.now() - start_time).total_seconds() * 1000
 
         return {

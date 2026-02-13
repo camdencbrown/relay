@@ -167,10 +167,25 @@ class PipelineEngine:
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M%S")
 
         if fmt == "parquet":
+            import pyarrow as pa
+            import pyarrow.parquet as pq
+
             filename = f"{timestamp}.parquet"
             buffer = BytesIO()
             comp = compression if compression != "none" else None
-            df.to_parquet(buffer, compression=comp, index=False)
+            # Build pyarrow table without going through pandas parquet layer
+            arrays = []
+            names = []
+            for col_name in df.columns:
+                names.append(col_name)
+                values = df[col_name].tolist()
+                try:
+                    arrays.append(pa.array(values))
+                except (pa.ArrowInvalid, pa.ArrowTypeError):
+                    # Mixed types -- cast to strings
+                    arrays.append(pa.array([str(v) if v is not None and v == v else None for v in values]))
+            table = pa.table(dict(zip(names, arrays)))
+            pq.write_table(table, buffer, compression=comp)
             buffer.seek(0)
         elif fmt == "csv":
             filename = f"{timestamp}.csv"
