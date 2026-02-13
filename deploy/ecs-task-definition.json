@@ -1,0 +1,62 @@
+{
+  "family": "relay",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/relayTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "relay",
+      "image": "ACCOUNT_ID.dkr.ecr.us-west-1.amazonaws.com/relay:latest",
+      "portMappings": [
+        {
+          "containerPort": 8001,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "healthCheck": {
+        "command": ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\" || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 10
+      },
+      "environment": [
+        {"name": "PORT", "value": "8001"},
+        {"name": "LOG_LEVEL", "value": "INFO"},
+        {"name": "DATABASE_URL", "value": "sqlite:////app/data/relay.db"}
+      ],
+      "secrets": [
+        {"name": "AWS_ACCESS_KEY_ID", "valueFrom": "arn:aws:secretsmanager:us-west-1:ACCOUNT_ID:secret:relay/aws-access-key"},
+        {"name": "AWS_SECRET_ACCESS_KEY", "valueFrom": "arn:aws:secretsmanager:us-west-1:ACCOUNT_ID:secret:relay/aws-secret-key"},
+        {"name": "ANTHROPIC_API_KEY", "valueFrom": "arn:aws:secretsmanager:us-west-1:ACCOUNT_ID:secret:relay/anthropic-key"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/relay",
+          "awslogs-region": "us-west-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "mountPoints": [
+        {
+          "sourceVolume": "relay-data",
+          "containerPath": "/app/data"
+        }
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "name": "relay-data",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "fs-PLACEHOLDER",
+        "rootDirectory": "/relay"
+      }
+    }
+  ]
+}

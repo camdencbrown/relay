@@ -1,163 +1,106 @@
-# Relay - Agent-Native Data Movement Platform
+# Relay
 
-**Where agents move data.**
+**Agent-Native Data Movement and Analytics Platform**
 
-Relay is a data movement and analytics platform designed from scratch for AI agents. Unlike traditional tools built for humans with APIs added later, Relay provides a self-documenting, intuitive API that agents can discover and use independently.
+Relay is a FastAPI + DuckDB + S3 platform built for AI agents to ingest, query, transform, and export data through a self-describing API. Point it at any data source, and it handles the rest.
 
-## 🎯 Key Features
+## Features
 
-- **Agent-First Design** - Self-documenting `/capabilities` endpoint tells agents everything in one call
-- **Instant Setup** - From zero to querying data in under 10 minutes (proven with independent agent tests)
-- **High Performance** - Query 800K+ rows in sub-second time, stream 10M+ rows efficiently
-- **Multi-Source Support** - REST APIs, CSV/JSON URLs, MySQL, Postgres, Salesforce
-- **DuckDB Query Engine** - Full SQL support with in-memory processing over S3
-- **S3 Storage** - Data stored as compressed Parquet files in AWS S3
+- **Agent-First API** -- Single `/capabilities` endpoint teaches an agent the entire API
+- **Multi-Source Ingestion** -- CSV/JSON URLs, REST APIs, MySQL, PostgreSQL, Salesforce, synthetic data
+- **DuckDB Query Engine** -- Full SQL (JOINs, CTEs, window functions) over S3 Parquet files
+- **Streaming Pipeline** -- Millions of rows with chunked processing and parallel S3 writes
+- **AI Semantics** -- Anthropic Claude generates column descriptions and business meanings
+- **SQLite Storage** -- Pipeline configs, run history, and metadata in a single database file
+- **Auth** -- SHA-256 hashed API keys, optional enforcement via `REQUIRE_AUTH`
 
-## 🚀 Quick Start
+## Quick Start
 
-### 1. Clone & Install
+### Local
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/relay.git
-cd relay
-pip install -r requirements.txt
+# Clone and install
+git clone <repo-url> && cd relay
+pip install -e ".[dev,connectors,ai]"
+
+# Configure
+cp .env.example .env
+# Edit .env with your AWS credentials
+
+# Run
+python -m src.main
 ```
 
-### 2. Configure AWS Credentials
+### Docker
 
 ```bash
 cp .env.example .env
-# Edit .env with your AWS credentials
+# Edit .env
+docker compose up --build
 ```
 
-See [GITHUB_SETUP.md](GITHUB_SETUP.md) for detailed configuration instructions.
+The API is available at `http://localhost:8001`. Start with `GET /api/v1/capabilities`.
 
-### 3. Start Relay
+## Architecture
 
-**Option A: PowerShell Script (Windows)**
-```powershell
-.\start_relay.ps1
+```
+src/
+  main.py            # FastAPI app, lifespan, health check
+  config.py          # pydantic-settings centralized config
+  database.py        # SQLAlchemy session management
+  models.py          # SQLAlchemy ORM models
+  storage.py         # SQLite-backed CRUD (dict in/out)
+  connectors.py      # ConnectorRegistry -- all source types
+  pipeline.py        # Pipeline execution engine
+  streaming.py       # Chunked write to S3/Postgres
+  query.py           # DuckDB query engine
+  transform.py       # DuckDB-based joins/aggregations
+  metadata.py        # Column profiling & knowledge base
+  ai_semantics.py    # Anthropic Claude integration
+  auth.py            # API key hashing & FastAPI Depends
+  s3.py              # S3 client factory
+  routes/            # API endpoints split by domain
 ```
 
-**Option B: Direct Command**
+## Configuration
+
+All settings are environment variables (see [docs/configuration.md](docs/configuration.md)):
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_URL` | `sqlite:///relay.db` | SQLAlchemy database URL |
+| `AWS_ACCESS_KEY_ID` | | AWS credentials for S3 |
+| `AWS_SECRET_ACCESS_KEY` | | AWS credentials for S3 |
+| `S3_BUCKET_NAME` | | Default S3 bucket |
+| `REQUIRE_AUTH` | `false` | Enforce API key auth |
+| `ANTHROPIC_API_KEY` | | Enable AI semantics |
+| `LOG_LEVEL` | `INFO` | Logging level |
+
+## API Overview
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/v1/capabilities` | GET | Self-describing API discovery |
+| `/api/v1/pipeline/create` | POST | Create a data pipeline |
+| `/api/v1/pipeline/list` | GET | List all pipelines |
+| `/api/v1/pipeline/{id}/run` | POST | Execute a pipeline |
+| `/api/v1/query` | POST | SQL query over pipeline data |
+| `/api/v1/schema` | POST | Get table schemas |
+| `/api/v1/export` | POST | Export as CSV/JSON/Excel |
+| `/api/v1/datasets/search` | GET | Search datasets |
+| `/api/v1/pipeline/create-transformation` | POST | Join/aggregate sources |
+
+See [docs/api.md](docs/api.md) for the full reference.
+
+## Development
+
 ```bash
-python -m uvicorn src.main:app --host 0.0.0.0 --port 8001
+pip install -e ".[dev,connectors,ai]"
+pytest                    # Run tests
+pytest --cov=src          # With coverage
+ruff check src/           # Lint
 ```
 
-### 4. Verify
+## License
 
-Visit http://localhost:8001 or check the API:
-```bash
-curl http://localhost:8001/api/v1/capabilities
-```
-
-## 📖 Documentation
-
-- **[GITHUB_SETUP.md](GITHUB_SETUP.md)** - Team setup & security guidelines
-- **[TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md)** - Architecture deep-dive
-- **[DEMO.md](DEMO.md)** - Demo script and examples
-- **API Docs** - http://localhost:8001/docs (when server is running)
-
-## 🧪 Agent Testing
-
-Relay has been validated by independent AI agents with zero prior knowledge:
-
-- **Usability Score:** 9/10
-- **Time to Complete Workflow:** 8-9 minutes
-- **Agent Feedback:** _"This is exactly what an agent-native data platform should be."_
-
-See [E2E_TEST_REPORT.md](E2E_TEST_REPORT.md) for full test results.
-
-## 🔌 Supported Data Sources
-
-- **REST APIs** - Any public API endpoint
-- **CSV/JSON URLs** - Direct file downloads
-- **MySQL** - Database connections
-- **PostgreSQL** - Database connections
-- **Salesforce** - SOQL query support
-- **Synthetic Data** - Built-in generator for testing
-
-## 🔍 Example Workflow
-
-```python
-import requests
-
-base_url = "http://localhost:8001/api/v1"
-
-# 1. Create a pipeline
-pipeline = requests.post(f"{base_url}/pipeline/create", json={
-    "name": "crypto_data",
-    "source": {
-        "type": "rest_api",
-        "url": "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd"
-    },
-    "destination": {
-        "type": "s3",
-        "bucket": "your-bucket",
-        "path": "data/crypto/"
-    }
-}).json()
-
-pipeline_id = pipeline["pipeline_id"]
-
-# 2. Run the pipeline
-run = requests.post(f"{base_url}/pipeline/{pipeline_id}/run").json()
-
-# 3. Query the data
-results = requests.post(f"{base_url}/query", json={
-    "pipelines": [pipeline_id],
-    "sql": "SELECT name, market_cap FROM crypto_data ORDER BY market_cap DESC LIMIT 10"
-}).json()
-
-print(results["rows"])
-```
-
-## 📊 Performance
-
-**Proven Capabilities:**
-- 10M rows loaded in 73 seconds (136K rows/sec)
-- 826K row dataset queried in 2.5 seconds
-- Complex 3-table JOINs with sub-second response
-- Automatic parallelization (2-20 workers based on dataset size)
-
-## 🛡️ Security
-
-**⚠️ IMPORTANT:** Never commit credentials to git!
-
-- All credentials stored in `.env` file (gitignored)
-- `.env.example` provides template
-- See [GITHUB_SETUP.md](GITHUB_SETUP.md) for security best practices
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Configure your `.env` file (don't commit it!)
-4. Make your changes
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-## 📝 License
-
-[Add your license here]
-
-## 🙋 Support
-
-- **Documentation:** See docs/ directory
-- **Issues:** Open a GitHub issue
-- **Questions:** [Your contact/support channel]
-
-## 🎯 Why Agent-Native?
-
-Traditional data tools (Airbyte, Fivetran) were built for humans with APIs added later. Agents need:
-- ✅ Self-documentation in one API call
-- ✅ Smart defaults (80% less configuration)
-- ✅ Clear error messages
-- ✅ Simple, predictable workflows
-
-Relay delivers all of this. **Cost:** 90% cheaper than Fivetran ($100 vs $2K/month).
-
----
-
-**Built for agents. Tested by agents. Approved by agents.** 🤖✨
+MIT

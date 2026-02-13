@@ -1,0 +1,15 @@
+services:
+  relay:
+    build: .
+    ports:
+      - "8001:8001"
+    volumes:
+      - relay-data:/app/data
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=sqlite:////app/data/relay.db
+    restart: unless-stopped
+
+volumes:
+  relay-data:

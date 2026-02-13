@@ -6,6 +6,7 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 ENV/
 build/
 develop-eggs/
@@ -25,7 +26,6 @@ wheels/
 
 # Environment
 .env
-.venv
 .env.local
 .env.*.local
 
@@ -41,18 +41,22 @@ aws_credentials.txt
 *.swp
 *.swo
 
+# Database
+*.db
+*.db-journal
+
 # Relay specific
 pipelines.json
+api_keys.json
+metadata/
 *.log
-metadata/*.json
-
-# Test data (optional - can commit sample data)
-*.csv
-!products.csv
-!sales.csv
-!reviews.csv
 
 # Generated outputs
 *.parquet
 *.xlsx
-profit_visualization.png
+
+# Test / coverage
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml

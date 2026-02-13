@@ -1,5 +1,0 @@
-{
-  "sql": "SELECT p.category, ROUND(SUM(p.price * s.quantity), 2) as revenue, ROUND(SUM((p.price - p.cost) * s.quantity), 2) as profit, ROUND((SUM((p.price - p.cost) * s.quantity) / SUM(p.price * s.quantity)) * 100, 2) as profit_margin_pct FROM products p INNER JOIN sales s ON p.product_id = s.product_id GROUP BY p.category ORDER BY profit DESC",
-  "pipelines": ["pipe-27b2eec1", "pipe-1d3a22d2"],
-  "format": "json"
-}
