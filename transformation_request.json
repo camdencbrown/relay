@@ -1,0 +1,52 @@
+{
+  "name": "User Post Count Analysis",
+  "description": "Join users and posts to count posts per user",
+  "sources": [
+    {
+      "type": "json_url",
+      "url": "http://localhost:8002/test_users.json",
+      "alias": "users"
+    },
+    {
+      "type": "json_url",
+      "url": "http://localhost:8002/test_posts.json",
+      "alias": "posts"
+    }
+  ],
+  "transformation": {
+    "type": "join_and_aggregate",
+    "join": {
+      "type": "left",
+      "left_dataset": "users",
+      "right_dataset": "posts",
+      "left_key": "id",
+      "right_key": "userId"
+    },
+    "aggregation": {
+      "group_by": ["users.id", "users.name"],
+      "aggregates": [
+        {
+          "column": "posts.id",
+          "function": "count",
+          "alias": "post_count"
+        }
+      ]
+    },
+    "output_columns": ["name", "post_count"],
+    "sort": [
+      {
+        "column": "post_count",
+        "direction": "desc"
+      }
+    ]
+  },
+  "destination": {
+    "type": "s3",
+    "bucket": "airbyte-poc-bucket-cb",
+    "path": "relay/analysis/"
+  },
+  "options": {
+    "format": "parquet",
+    "compression": "gzip"
+  }
+}

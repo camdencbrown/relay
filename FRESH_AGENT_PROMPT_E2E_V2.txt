@@ -1,0 +1,125 @@
+# Fresh Agent E2E Test - Relay Data Platform
+
+## Your Mission
+
+You are testing **Relay**, an agent-native data movement and analytics platform. Your goal is to complete a full business intelligence workflow from raw data to insights with visualization.
+
+You have ZERO prior knowledge of Relay. Figure it out as you go.
+
+---
+
+## Context
+
+**Relay API:** http://localhost:8001/api/v1  
+**Relay Docs:** http://localhost:8001/docs  
+**Test Data Source:** http://localhost:8002 (HTTP file server with CSVs)
+
+**Your Environment:**
+- Windows machine
+- Python 3.12 available
+- Standard libraries (requests, pandas, matplotlib)
+- AWS S3 bucket already configured: `airbyte-poc-bucket-cb` (region: us-west-1)
+
+---
+
+## Business Question
+
+**"Which sales region generated the highest revenue in Q4 2024, and what were the top 3 products sold there?"**
+
+You need to analyze sales data across multiple tables to answer this question with supporting visualizations.
+
+---
+
+## Available Test Data
+
+The following CSV files are available at http://localhost:8002:
+
+1. **customers.csv** - Customer information
+2. **orders.csv** - Order transactions  
+3. **order_items.csv** - Line items for each order
+
+These contain realistic e-commerce data for 2024. You'll need to join them together.
+
+---
+
+## Your Task
+
+Complete the ENTIRE workflow end-to-end:
+
+### 1. **Discovery Phase**
+- Explore Relay's capabilities (hint: check `/capabilities` endpoint)
+- Understand what operations are available
+- Figure out how to load data
+
+### 2. **Data Loading**
+- Load all 3 CSV files into Relay
+- Create pipelines to move data to S3
+- Verify successful uploads
+
+### 3. **Data Analysis**
+- Query the data to answer the business question
+- Calculate revenue by region for Q4 (Oct-Dec 2024)
+- Identify top 3 products in the winning region
+- Join data across multiple tables as needed
+
+### 4. **Export & Visualization**
+- Export your query results
+- Create at least one visualization (bar chart, pie chart, etc.)
+- Save the chart as an image file
+
+### 5. **Present Findings**
+- Write a clear answer to the business question
+- Include supporting data (numbers, percentages)
+- Attach your visualization(s)
+
+---
+
+## Success Criteria
+
+✅ All 3 datasets loaded successfully into Relay  
+✅ Complex multi-table SQL queries executed  
+✅ Business question answered correctly with data  
+✅ Professional visualization(s) created  
+✅ Complete workflow from raw data → insight  
+
+---
+
+## Rules
+
+- **No help allowed** - Figure out the API yourself
+- **Document your process** - Track time, steps, issues encountered
+- **Be resourceful** - Read docs, explore endpoints, test things
+- **Adapt as needed** - If something doesn't work, find another way
+- **Rate the experience** - Give honest feedback (1-10) on usability
+
+---
+
+## Evaluation
+
+At the end, provide:
+
+1. **Time breakdown** - How long each phase took
+2. **Issues encountered** - What problems did you hit?
+3. **Workarounds used** - How did you solve them?
+4. **API usability rating** - Score 1-10 with reasoning
+5. **Recommendations** - What would make this better?
+
+---
+
+## Hints (Only if stuck)
+
+- Start with `/api/v1/capabilities` - it's self-documenting
+- Relay has `/query` and `/export` endpoints for data analysis
+- DuckDB SQL dialect is supported
+- Pipeline creation is async - check status after creation
+
+---
+
+## Good Luck! 🚀
+
+This is a real test of agent-native design. If Relay is truly built for AI agents, you should be able to complete this workflow smoothly with minimal friction.
+
+**Start time:** (record when you begin)  
+**Target completion:** Under 10 minutes for the full workflow  
+
+Go!

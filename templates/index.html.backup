@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relay - Agent-Native Data Movement</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+            background: #0a0e27;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 80px;
+            background: #0f1629;
+            border-right: 1px solid #1e293b;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+            z-index: 100;
+        }
+        
+        .logo {
+            margin-bottom: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            position: relative;
+        }
+        
+        .logo-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .logo-text {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #94a3b8;
+            letter-spacing: 1px;
+        }
+        
+        .nav-item {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            margin: 10px 0;
+            color: #64748b;
+            font-size: 0.7rem;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        
+        .nav-item:hover, .nav-item.active {
+            background: #1e293b;
+            color: #60a5fa;
+        }
+        
+        .nav-icon {
+            width: 20px;
+            height: 20px;
+        }
+        
+        /* Main content */
+        .main {
+            margin-left: 80px;
+            padding: 30px 40px;
+            min-height: 100vh;
+        }
+        
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .header-title {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(96, 165, 250, 0.4);
+        }
+        
+        /* Stats grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: #0f1629;
+            border: 1px solid #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #60a5fa, #a78bfa);
+        }
+        
+        .stat-label {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* Pipeline cards */
+        .pipelines-section {
+            margin-top: 30px;
+        }
+        
+        .section-header {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #f1f5f9;
+        }
+        
+        .pipeline-card {
+            background: #0f1629;
+            border: 1px solid #1e293b;
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+        
+        .pipeline-card:hover {
+            border-color: #334155;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+        
+        .pipeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .pipeline-title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .pipeline-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .status-badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .status-running {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+        }
+        
+        .status-running::before {
+            background: #60a5fa;
+        }
+        
+        .status-active {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+        }
+        
+        .status-active::before {
+            background: #4ade80;
+        }
+        
+        .status-paused {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+        
+        .status-paused::before {
+            background: #fbbf24;
+        }
+        
+        .status-failed {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+        
+        .status-failed::before {
+            background: #f87171;
+        }
+        
+        .pipeline-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            background: transparent;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-sm:hover {
+            border-color: #60a5fa;
+            color: #60a5fa;
+        }
+        
+        .btn-stop {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+        
+        .btn-stop:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+        
+        /* Pipeline stages */
+        .pipeline-stages {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+        
+        .stage {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 15px;
+            position: relative;
+        }
+        
+        .stage-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        
+        .stage-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .stage.active .stage-icon {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+        }
+        
+        .stage.pending .stage-icon {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+        
+        .stage.completed .stage-icon {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+        }
+        
+        .stage.stopped .stage-icon {
+            background: rgba(100, 116, 139, 0.2);
+            color: #64748b;
+        }
+        
+        .stage-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+        }
+        
+        .stage-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 8px;
+        }
+        
+        .stage-status {
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .stage.active .stage-status {
+            color: #4ade80;
+        }
+        
+        .stage.pending .stage-status {
+            color: #fbbf24;
+        }
+        
+        .stage.completed .stage-status {
+            color: #4ade80;
+        }
+        
+        .stage.stopped .stage-status {
+            color: #64748b;
+        }
+        
+        /* Progress bar between stages */
+        .stage::after {
+            content: '';
+            position: absolute;
+            top: 35px;
+            right: -17px;
+            width: 20px;
+            height: 2px;
+            background: #334155;
+        }
+        
+        .stage:last-child::after {
+            display: none;
+        }
+        
+        .stage.completed::after {
+            background: linear-gradient(90deg, #4ade80, #334155);
+        }
+        
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+        
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
+        .empty-state h3 {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #94a3b8;
+        }
+        
+        .empty-state p {
+            margin-bottom: 20px;
+        }
+        
+        /* Footer */
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #1e293b;
+            text-align: center;
+            color: #64748b;
+            font-size: 0.85rem;
+        }
+        
+        .footer a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z"/>
+                    <path d="M2 17L12 22L22 17"/>
+                    <path d="M2 12L12 17L22 12"/>
+                </svg>
+            </div>
+            <div class="logo-text">RELAY</div>
+        </div>
+        <div class="nav-item active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            <div>Dashboard</div>
+        </div>
+        <div class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"/>
+                <line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="3.01" y2="6"/>
+                <line x1="3" y1="12" x2="3.01" y2="12"/>
+                <line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+            <div>Pipelines</div>
+        </div>
+        <div class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v6m0 6v6M5.6 5.6l4.2 4.2m4.2 4.2l4.2 4.2M1 12h6m6 0h6M5.6 18.4l4.2-4.2m4.2-4.2l4.2-4.2"/>
+            </svg>
+            <div>Settings</div>
+        </div>
+    </div>
+    
+    <!-- Main content -->
+    <div class="main">
+        <div class="header">
+            <h1 class="header-title">Pipelines</h1>
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="window.location.href='/docs'">API Docs</button>
+            </div>
+        </div>
+        
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Pipelines</div>
+                <div class="stat-value" id="total-pipelines">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active</div>
+                <div class="stat-value" id="active-pipelines">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Runs</div>
+                <div class="stat-value" id="total-runs">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Rows Processed</div>
+                <div class="stat-value" id="rows-processed">0</div>
+            </div>
+        </div>
+        
+        <!-- Pipelines -->
+        <div class="pipelines-section">
+            <h2 class="section-header">Active Pipelines</h2>
+            <div id="pipelines-list"></div>
+        </div>
+        
+        <div class="footer">
+            <p>
+                <a href="/api/v1/capabilities">API Capabilities</a> | 
+                <a href="/docs">Documentation</a>
+            </p>
+            <p style="margin-top: 10px;">Relay v1.0 - Agent-Native Data Movement Platform</p>
+        </div>
+    </div>
+    
+    <script>
+        async function loadPipelines() {
+            try {
+                const response = await fetch('/api/v1/pipeline/list');
+                const data = await response.json();
+                
+                // Update stats
+                document.getElementById('total-pipelines').textContent = data.total;
+                document.getElementById('active-pipelines').textContent = 
+                    data.pipelines.filter(p => p.status === 'active').length;
+                document.getElementById('total-runs').textContent = 
+                    data.pipelines.reduce((sum, p) => sum + p.total_runs, 0);
+                
+                // Calculate total rows processed
+                let totalRows = 0;
+                data.pipelines.forEach(p => {
+                    if (p.last_run && p.last_run.rows_processed) {
+                        totalRows += p.last_run.rows_processed;
+                    }
+                });
+                document.getElementById('rows-processed').textContent = totalRows.toLocaleString();
+                
+                // Render pipelines
+                const listEl = document.getElementById('pipelines-list');
+                
+                if (data.pipelines.length === 0) {
+                    listEl.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">&#128640;</div>
+                            <h3>No pipelines yet</h3>
+                            <p>Create your first pipeline via the API</p>
+                            <button class="btn btn-primary" onclick="window.location.href='/docs'">
+                                View API Documentation
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    listEl.innerHTML = data.pipelines.map(p => {
+                        const lastRun = p.last_run;
+                        const statusClass = lastRun ? 
+                            (lastRun.status === 'success' ? 'completed' : 
+                             lastRun.status === 'running' ? 'active' : 'stopped') : 
+                            'pending';
+                        
+                        return `
+                            <div class="pipeline-card">
+                                <div class="pipeline-header">
+                                    <div class="pipeline-title-group">
+                                        <div class="pipeline-name">${p.name}</div>
+                                        <span class="status-badge status-${p.status}">${p.status}</span>
+                                    </div>
+                                    <div class="pipeline-actions">
+                                        <button class="btn-sm">Edit</button>
+                                        <button class="btn-sm">Pause</button>
+                                        <button class="btn-sm btn-stop">Stop</button>
+                                    </div>
+                                </div>
+                                <div class="pipeline-stages">
+                                    <div class="stage active">
+                                        <div class="stage-icon">&#x1F4E5;</div>
+                                        <div class="stage-label">SOURCE</div>
+                                        <div class="stage-name">${p.source_type.toUpperCase()}</div>
+                                        <div class="stage-status">Active</div>
+                                    </div>
+                                    <div class="stage ${statusClass}">
+                                        <div class="stage-icon">&#x1F916;</div>
+                                        <div class="stage-label">AGENT</div>
+                                        <div class="stage-name">PROCESSING</div>
+                                        <div class="stage-status">${lastRun ? lastRun.status : 'Pending'}</div>
+                                    </div>
+                                    <div class="stage ${statusClass}">
+                                        <div class="stage-icon">&#x2699;</div>
+                                        <div class="stage-label">TRANSFORMATION</div>
+                                        <div class="stage-name">${p.destination_type === 's3' ? 'PARQUET' : 'PASSTHROUGH'}</div>
+                                        <div class="stage-status">${lastRun ? lastRun.status : 'Pending'}</div>
+                                    </div>
+                                    <div class="stage ${statusClass}">
+                                        <div class="stage-icon">&#x1F3E0;</div>
+                                        <div class="stage-label">DESTINATION</div>
+                                        <div class="stage-name">${p.destination_type.toUpperCase()}</div>
+                                        <div class="stage-status">${lastRun ? `${lastRun.rows_processed || 0} rows` : 'Pending'}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Failed to load pipelines:', error);
+            }
+        }
+        
+        // Load initially
+        loadPipelines();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(loadPipelines, 5000);
+    </script>
+</body>
+</html>

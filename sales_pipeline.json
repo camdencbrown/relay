@@ -1,0 +1,12 @@
+{
+  "name": "sales",
+  "source": {
+    "type": "csv_url",
+    "url": "http://localhost:8002/sales.csv"
+  },
+  "destination": {
+    "type": "s3",
+    "bucket": "airbyte-poc-bucket-cb",
+    "path": "relay/sales/"
+  }
+}

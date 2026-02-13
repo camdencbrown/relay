@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metadata Review - Relay</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 240px;
+            background: #111;
+            border-right: 1px solid #222;
+            padding: 24px;
+            position: fixed;
+            height: 100vh;
+        }
+
+        .logo {
+            margin-bottom: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+        }
+        
+        .logo-icon svg {
+            width: 100%;
+            height: 100%;
+            stroke: #4a9eff;
+        }
+        
+        .logo-text {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #94a3b8;
+            letter-spacing: 1px;
+        }
+
+        .nav-item {
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #888;
+            text-decoration: none;
+            display: block;
+        }
+
+        .nav-item:hover {
+            background: #1a1a1a;
+            color: #fff;
+        }
+
+        .nav-item.active {
+            background: #1a1a1a;
+            color: #4a9eff;
+        }
+
+        .main-content {
+            margin-left: 240px;
+            flex: 1;
+            padding: 32px 48px;
+        }
+
+        .header {
+            margin-bottom: 32px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+
+        .header p {
+            color: #888;
+            font-size: 16px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 12px;
+            padding: 20px;
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #4a9eff;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 14px;
+        }
+
+        .review-card {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+
+        .review-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 16px;
+        }
+
+        .column-info h3 {
+            font-size: 20px;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .column-meta {
+            display: flex;
+            gap: 16px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-type {
+            background: #1a2a3a;
+            color: #4a9eff;
+        }
+
+        .badge-semantic {
+            background: #2a1a3a;
+            color: #b84aff;
+        }
+
+        .ai-suggestion {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .ai-label {
+            color: #4a9eff;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .ai-text {
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+
+        .sample-values {
+            background: #0a0a0a;
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 16px 0;
+        }
+
+        .sample-values code {
+            color: #4aff9e;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .edit-section {
+            margin-top: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            background: #0a0a0a;
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 12px;
+            color: #fff;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+        textarea.form-input {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #4a9eff;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #3a8eef;
+        }
+
+        .btn-secondary {
+            background: #1a1a1a;
+            color: #888;
+            border: 1px solid #222;
+        }
+
+        .btn-secondary:hover {
+            background: #2a2a2a;
+            color: #fff;
+        }
+
+        .btn-danger {
+            background: #ff4a4a;
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background: #ef3a3a;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 64px 32px;
+            color: #666;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 48px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z"/>
+                    <path d="M2 17L12 22L22 17"/>
+                    <path d="M2 12L12 17L22 12"/>
+                </svg>
+            </div>
+            <div class="logo-text">RELAY</div>
+        </div>
+        <a href="/" class="nav-item">Dashboard</a>
+        <a href="/metadata" class="nav-item active">Metadata Review</a>
+        <a href="/docs" class="nav-item">API Docs</a>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h1>Metadata Review</h1>
+            <p>Review and approve AI-generated column descriptions</p>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="pending-count">-</div>
+                <div class="stat-label">Pending Review</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="verified-count">-</div>
+                <div class="stat-label">Verified Columns</div>
+            </div>
+        </div>
+
+        <div id="reviews-container">
+            <div class="loading">Loading pending reviews...</div>
+        </div>
+    </div>
+
+    <script>
+        async function loadPendingReviews() {
+            try {
+                const response = await fetch('/api/v1/metadata/review/pending');
+                const data = await response.json();
+                
+                // Update stats
+                document.getElementById('pending-count').textContent = data.pending_count;
+                
+                // Load knowledge base count
+                // For now, placeholder
+                document.getElementById('verified-count').textContent = '0';
+                
+                // Render reviews
+                const container = document.getElementById('reviews-container');
+                
+                if (data.pending_count === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <h3>All caught up!</h3>
+                            <p>No columns pending review</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Group by pipeline
+                const byPipeline = {};
+                data.pending_reviews.forEach(item => {
+                    if (!byPipeline[item.pipeline]) {
+                        byPipeline[item.pipeline] = [];
+                    }
+                    byPipeline[item.pipeline].push(item);
+                });
+                
+                // Render each pipeline's columns
+                let html = '';
+                for (const [pipeline, columns] of Object.entries(byPipeline)) {
+                    html += `<h2 style="color: #fff; margin: 32px 0 16px; font-size: 20px;">Pipeline: ${pipeline}</h2>`;
+                    
+                    columns.forEach(col => {
+                        html += renderReviewCard(col);
+                    });
+                }
+                
+                container.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Failed to load reviews:', error);
+                document.getElementById('reviews-container').innerHTML = `
+                    <div class="empty-state">
+                        <p style="color: #ff4a4a;">Failed to load reviews: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderReviewCard(col) {
+            const sampleValues = col.sample_values.slice(0, 5).join(', ');
+            
+            return `
+                <div class="review-card" data-column="${col.column}">
+                    <div class="review-header">
+                        <div class="column-info">
+                            <h3>${col.column}</h3>
+                            <div class="column-meta">
+                                <span class="badge badge-type">${col.type}</span>
+                                <span class="badge badge-semantic">${col.semantic_type}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="ai-suggestion">
+                        <div class="ai-label">AI Generated Description</div>
+                        <div class="ai-text">${col.auto_description || 'No description generated'}</div>
+                    </div>
+                    
+                    <div class="sample-values">
+                        <div class="ai-label">Sample Values</div>
+                        <code>${sampleValues}</code>
+                    </div>
+                    
+                    <div class="edit-section">
+                        <div class="form-group">
+                            <label class="form-label">Description</label>
+                            <input type="text" class="form-input" id="desc-${col.column}" value="${col.auto_description || ''}">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Business Meaning (Optional)</label>
+                            <textarea class="form-input" id="meaning-${col.column}" placeholder="What does this represent in business terms?"></textarea>
+                        </div>
+                        
+                        <div class="button-group">
+                            <button class="btn btn-primary" onclick="approveColumn('${col.column}')">
+                                Approve
+                            </button>
+                            <button class="btn btn-secondary" onclick="skipColumn('${col.column}')">
+                                Skip
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        async function approveColumn(columnName) {
+            const description = document.getElementById(`desc-${columnName}`).value;
+            const businessMeaning = document.getElementById(`meaning-${columnName}`).value;
+            
+            if (!description) {
+                alert('Please provide a description');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/v1/metadata/review/approve', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        column_name: columnName,
+                        description: description,
+                        business_meaning: businessMeaning || null,
+                        verified_by: 'user'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'approved') {
+                    // Remove the card
+                    const card = document.querySelector(`[data-column="${columnName}"]`);
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateX(-20px)';
+                    setTimeout(() => {
+                        card.remove();
+                        // Reload to update counts
+                        loadPendingReviews();
+                    }, 300);
+                    
+                    alert(`✓ Column "${columnName}" approved and added to knowledge base!`);
+                } else {
+                    alert('Failed to approve column');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        function skipColumn(columnName) {
+            const card = document.querySelector(`[data-column="${columnName}"]`);
+            card.style.opacity = '0';
+            setTimeout(() => {
+                card.remove();
+            }, 300);
+        }
+        
+        // Load on page load
+        loadPendingReviews();
+    </script>
+</body>
+</html>

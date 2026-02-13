@@ -1,0 +1,97 @@
+# E-commerce Analysis - Fresh Agent Test (FINAL)
+
+## Context
+
+You have access to **Relay** (http://localhost:8001), an agent-native data platform for autonomous data movement and transformation.
+
+**Relay is fully configured with AWS S3 credentials** - pipelines will automatically upload data to S3.
+
+## Available Data
+
+Three CSV files containing realistic e-commerce data:
+
+- **Customers:** http://localhost:8002/customers.csv (50,000 rows)
+- **Orders:** http://localhost:8002/orders.csv (141,303 rows)  
+- **Order Items:** http://localhost:8002/order_items.csv (634,948 rows)
+
+**Total:** ~826,000 rows
+
+## Business Question
+
+**Which customers in California spent over $10,000 in 2024 on COMPLETED orders, and what was their average order value? Show the top 10 by total spend.**
+
+### Critical Requirements:
+- **State:** California (CA) only
+- **Year:** 2024 only  
+- **Status:** COMPLETED orders only (orders table has status column - exclude 'pending', 'shipped', 'cancelled')
+- **Threshold:** Total spend > $10,000
+- **Calculation:** Line total = order_items.quantity × order_items.price
+- **Aggregation:** Sum line totals by customer, count distinct orders
+- **Output:** Top 10 customers sorted by total_spend DESC
+
+## Your Task
+
+1. **Load all three datasets into Relay**
+   - Create 3 pipelines (one for each CSV)
+   - Relay will automatically upload to S3
+   - Wait for each pipeline to complete
+   
+2. **Discover relationships**
+   - Use Relay's metadata/search APIs to understand the schema
+   - Identify join keys:
+     - customers.customer_id = orders.customer_id
+     - orders.order_id = order_items.order_id
+   
+3. **Transform the data**
+   - Join all 3 tables
+   - Filter: state = 'CA' AND order_date LIKE '2024%' AND status = 'completed'
+   - Calculate: line_total = quantity * price
+   - Group by customer_id, name
+   - Aggregate: SUM(line_total) as total_spend, COUNT(DISTINCT order_id) as num_orders
+   - Calculate: avg_order_value = total_spend / num_orders
+   - Filter: total_spend > 10000
+   - Sort: total_spend DESC
+   - Limit: 10
+   
+4. **Present the answer**
+   - Show: customer name, total spend, average order value, number of orders
+   - Format clearly (table or list)
+
+## Expected Answer (for validation)
+
+The top customer should be:
+- **Sarah Moore** from San Francisco
+- **Total spend:** ~$30,920
+- **Avg order value:** ~$3,865
+- **Orders:** 8
+
+If you get this customer at #1 with approximately these numbers, you're correct!
+
+## Success Criteria
+
+✓ All 3 datasets loaded into Relay successfully
+✓ Data written to S3 (check pipeline status)
+✓ Correct join keys identified
+✓ Filters applied correctly (CA + 2024 + completed)
+✓ Math correct (quantity × price, then summed)
+✓ Top 10 list sorted by spend
+✓ Sarah Moore is #1
+
+## Technical Notes
+
+- Relay API docs: http://localhost:8001/api/v1/capabilities
+- S3 bucket: airbyte-poc-bucket-cb (already configured)
+- Expected pipeline create format:
+  ```json
+  {
+    "name": "Pipeline Name",
+    "source": {"type": "csv_url", "url": "http://localhost:8002/file.csv"},
+    "destination": {"type": "s3", "bucket": "airbyte-poc-bucket-cb", "path": "relay/your-path"}
+  }
+  ```
+
+## Test Goal
+
+Can you complete this complex multi-table analysis end-to-end without any help? This validates whether Relay is truly agent-native.
+
+Good luck! 🚀

@@ -1,0 +1,70 @@
+# End-to-End Workflow Test: Product Performance Analysis
+
+## Context
+
+You have access to **Relay** (http://localhost:8001), an agent-native data platform with query and export capabilities.
+
+You also have access to data visualization tools and can create charts.
+
+## Available Data
+
+Three CSV files containing 2024 product performance data:
+
+- **Products:** http://localhost:8002/products.csv (50 products)
+- **Sales:** http://localhost:8002/sales.csv (10,000 transactions)
+- **Reviews:** http://localhost:8002/reviews.csv (3,000 customer reviews)
+
+## Business Question
+
+**Which product category generated the most profit in 2024, and what was the profit margin?**
+
+**Additional analysis:** Show profit by category in a visualization (bar chart recommended).
+
+## Your Task
+
+Complete the ENTIRE workflow end-to-end:
+
+1. **Load data into Relay**
+   - Create 3 pipelines for the CSV files
+   - Wait for S3 upload completion
+
+2. **Query and analyze**
+   - Use Relay's `/query` endpoint to calculate profit by category
+   - Profit = (price - cost) × quantity
+   - Group by category, sort by total profit
+
+3. **Export for visualization**
+   - Use Relay's `/export` endpoint to get data as JSON or CSV
+   - Format: category, revenue, profit, profit_margin
+
+4. **Create visualization**
+   - Build a bar chart showing profit by category
+   - Use any tool you have (matplotlib, chart libraries, etc.)
+   - Save as image file
+
+5. **Present findings**
+   - Answer the business question clearly
+   - Include the visualization
+   - Explain profit margins across categories
+
+## Success Criteria
+
+✓ All 3 datasets loaded successfully
+✓ Correct profit calculation (revenue - cost)
+✓ Proper joins across tables
+✓ Export works and returns valid data
+✓ Visualization created and saved
+✓ Final answer is correct and well-presented
+
+## Technical Notes
+
+- Relay API: http://localhost:8001/api/v1
+- Data source: http://localhost:8002
+- S3 bucket: airbyte-poc-bucket-cb (already configured)
+- Check `/api/v1/capabilities` for full API documentation
+
+## Goal
+
+Test the complete agent workflow from raw data → Relay → query → export → visualization → insight.
+
+Good luck! 🚀

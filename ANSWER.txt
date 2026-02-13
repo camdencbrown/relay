@@ -1,0 +1,31 @@
+BUSINESS QUESTION:
+"Show me each user's name along with how many posts they've written. Order by most posts first."
+
+ANSWER:
+
+User Name            | Post Count
+---------------------|------------
+Alice Johnson        | 10
+Bob Smith            | 10
+Carol Williams       | 10
+David Brown          | 10
+Eve Davis            | 10
+
+DATA SOURCES:
+- Users: http://localhost:8002/test_users.json (5 users)
+- Posts: http://localhost:8002/test_posts.json (50 posts)
+
+JOIN KEY:
+users.id = posts.userId
+
+METHOD:
+1. Discovered datasets using /api/v1/datasets/search
+2. Retrieved metadata using /api/v1/metadata/{pipeline_id}
+3. Identified join relationship: users.id ↔ posts.userId
+4. Aggregated posts by userId (COUNT)
+5. Joined with users table to get names
+6. Sorted by post count descending
+
+All users have exactly 10 posts each (evenly distributed data).
+
+See TRANSFORMATION_TEST_RESULTS.md for detailed documentation.

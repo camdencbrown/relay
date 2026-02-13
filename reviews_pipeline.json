@@ -1,0 +1,12 @@
+{
+  "name": "reviews",
+  "source": {
+    "type": "csv_url",
+    "url": "http://localhost:8002/reviews.csv"
+  },
+  "destination": {
+    "type": "s3",
+    "bucket": "airbyte-poc-bucket-cb",
+    "path": "relay/reviews/"
+  }
+}

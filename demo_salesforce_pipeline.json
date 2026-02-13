@@ -1,0 +1,29 @@
+{
+  "name": "Salesforce Opportunities Demo",
+  "description": "Pull open opportunities for pipeline analysis",
+  "source": {
+    "type": "salesforce",
+    "username": "YOUR_SALESFORCE_USERNAME",
+    "password": "YOUR_SALESFORCE_PASSWORD",
+    "security_token": "YOUR_SALESFORCE_TOKEN",
+    "domain": "login",
+    "query": "SELECT Id, Name, Amount, StageName, CloseDate, AccountId, OwnerId, CreatedDate FROM Opportunity WHERE StageName != 'Closed Won' AND StageName != 'Closed Lost'"
+  },
+  "destination": {
+    "type": "s3",
+    "bucket": "airbyte-poc-bucket-cb",
+    "path": "relay/demo/opportunities/"
+  },
+  "options": {
+    "format": "parquet",
+    "compression": "snappy",
+    "streaming": true,
+    "parallel": true,
+    "generate_metadata": true,
+    "ai_semantics": true
+  },
+  "schedule": {
+    "enabled": false,
+    "interval": "daily"
+  }
+}

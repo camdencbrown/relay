@@ -1,0 +1,122 @@
+# Relay Real-World Data Challenge
+
+## Mission
+
+Test **Relay** (http://localhost:8001) by loading REAL data from public APIs and answering a business question with visualization.
+
+You have ZERO prior knowledge of Relay. Figure it out and deliver insights.
+
+---
+
+## Business Question
+
+**"Which cryptocurrency has the highest market cap, and how does its 24h price change compare to the top 5 competitors?"**
+
+Answer should include:
+- Top crypto by market cap
+- Price change % for top 5
+- Simple bar chart visualization
+
+---
+
+## Your Data Source
+
+**CoinGecko Public API** (no auth required)
+
+**Endpoint:** `https://api.coingecko.com/api/v3/coins/markets`
+
+**Parameters:**
+```
+?vs_currency=usd
+&order=market_cap_desc
+&per_page=10
+&page=1
+&sparkline=false
+```
+
+**Full URL:**
+```
+https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10&page=1&sparkline=false
+```
+
+This returns the top 10 cryptocurrencies by market cap with current prices, market caps, and 24h changes.
+
+---
+
+## Your Task
+
+**Phase 1: Discover Relay** (2 min)
+- Figure out what Relay can do
+- Understand how to load REST API data
+
+**Phase 2: Load Real Data** (3 min)
+- Create a pipeline that pulls from CoinGecko API
+- Move data to S3 via Relay
+- Verify it loaded successfully
+
+**Phase 3: Query & Analyze** (3 min)
+- Query the data to find top crypto by market cap
+- Get 24h price changes for top 5
+- Calculate any interesting metrics
+
+**Phase 4: Visualize** (2 min)
+- Create a simple bar chart showing price changes
+- Save as PNG
+
+**Target time:** 10 minutes
+
+---
+
+## Success Criteria
+
+✅ Loaded REAL data from CoinGecko API  
+✅ Data successfully moved to S3 via Relay  
+✅ Business question answered with numbers  
+✅ Visualization created and saved  
+✅ Workflow completed independently  
+
+---
+
+## Technical Notes
+
+**Relay API:** http://localhost:8001/api/v1  
+**S3 Bucket:** airbyte-poc-bucket-cb (already configured)  
+**Tools available:** Python, requests, pandas, matplotlib
+
+**Hint:** Relay supports REST API sources! Check `/capabilities` to see the source type.
+
+---
+
+## Deliverables
+
+1. **ANSWER.txt** - Clear answer with top crypto and price changes
+2. **crypto_chart.png** - Bar chart of 24h changes
+3. **Time breakdown** - How long each phase took
+4. **Usability rating** - 1-10 with reasoning
+5. **Feedback** - What worked? What didn't?
+
+---
+
+## Expected Results (Don't Peek!)
+
+Bitcoin should be #1 by market cap (~$1-2 trillion)  
+Ethereum usually #2 (~$300-500 billion)  
+Price changes typically range from -5% to +5% in 24h
+
+If your numbers are wildly different, double-check the data loaded correctly.
+
+---
+
+## Why This Test Matters
+
+This proves Relay can handle:
+- Real-world public APIs
+- Live financial data
+- No local test infrastructure needed
+- Production-grade workflow
+
+**Ready?**
+
+**Start time:** ________  
+
+Go! 🚀
