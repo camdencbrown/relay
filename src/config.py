@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # Encryption
     encryption_key: str = ""
 
+    # Ontology
+    ontology_auto_approve: bool = False
+
     # CORS
     cors_origins: str = "*"
 

@@ -9,7 +9,18 @@ from typing import Dict, List, Optional
 
 from .database import get_db
 from .encryption import encrypt_dict
-from .models import ColumnKnowledge, Connection, DatasetMetadata, Pipeline, PipelineRun
+from .models import (
+    ColumnKnowledge,
+    Connection,
+    DatasetMetadata,
+    OntologyDimension,
+    OntologyEntity,
+    OntologyMetric,
+    OntologyProposal,
+    OntologyRelationship,
+    Pipeline,
+    PipelineRun,
+)
 
 
 class Storage:
@@ -291,3 +302,298 @@ class Storage:
                 if source.get("connection") == connection_name:
                     result.append(row.to_dict())
             return result
+
+    # ------------------------------------------------------------------
+    # Ontology Entity CRUD
+    # ------------------------------------------------------------------
+
+    def save_entity(self, entity: Dict) -> Dict:
+        now = datetime.now(timezone.utc).isoformat()
+        with get_db() as db:
+            row = OntologyEntity(
+                id=entity["id"],
+                name=entity["name"],
+                display_name=entity["display_name"],
+                description=entity.get("description", ""),
+                pipeline_id=entity["pipeline_id"],
+                status=entity.get("status", "active"),
+                proposed_by=entity.get("proposed_by", "user"),
+                approved_by=entity.get("approved_by"),
+                approved_at=entity.get("approved_at"),
+                created_at=entity.get("created_at", now),
+                updated_at=entity.get("updated_at"),
+            )
+            row.column_annotations = entity.get("column_annotations", {})
+            db.add(row)
+            return row.to_dict()
+
+    def get_entity(self, entity_id: str) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyEntity).filter(OntologyEntity.id == entity_id).first()
+            return row.to_dict() if row else None
+
+    def get_entity_by_name(self, name: str) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyEntity).filter(OntologyEntity.name == name).first()
+            return row.to_dict() if row else None
+
+    def list_entities(self, status: str = None) -> List[Dict]:
+        with get_db() as db:
+            q = db.query(OntologyEntity)
+            if status:
+                q = q.filter(OntologyEntity.status == status)
+            return [r.to_dict() for r in q.order_by(OntologyEntity.created_at).all()]
+
+    def update_entity(self, entity_id: str, updates: Dict) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyEntity).filter(OntologyEntity.id == entity_id).first()
+            if not row:
+                return None
+            if "column_annotations" in updates:
+                row.column_annotations = updates.pop("column_annotations")
+            for key, value in updates.items():
+                if hasattr(row, key) and key not in ("id", "created_at"):
+                    setattr(row, key, value)
+            row.updated_at = datetime.now(timezone.utc).isoformat()
+            return row.to_dict()
+
+    def delete_entity(self, entity_id: str) -> bool:
+        with get_db() as db:
+            deleted = db.query(OntologyEntity).filter(OntologyEntity.id == entity_id).delete()
+            return deleted > 0
+
+    def get_entity_for_pipeline(self, pipeline_id: str) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyEntity).filter(OntologyEntity.pipeline_id == pipeline_id).first()
+            return row.to_dict() if row else None
+
+    # ------------------------------------------------------------------
+    # Ontology Relationship CRUD
+    # ------------------------------------------------------------------
+
+    def save_relationship(self, rel: Dict) -> Dict:
+        now = datetime.now(timezone.utc).isoformat()
+        with get_db() as db:
+            row = OntologyRelationship(
+                id=rel["id"],
+                name=rel["name"],
+                from_entity=rel["from_entity"],
+                to_entity=rel["to_entity"],
+                from_column=rel["from_column"],
+                to_column=rel["to_column"],
+                relationship_type=rel.get("relationship_type", "one_to_many"),
+                description=rel.get("description", ""),
+                status=rel.get("status", "active"),
+                proposed_by=rel.get("proposed_by", "user"),
+                created_at=rel.get("created_at", now),
+            )
+            db.add(row)
+            return row.to_dict()
+
+    def get_relationship(self, rel_id: str) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyRelationship).filter(OntologyRelationship.id == rel_id).first()
+            return row.to_dict() if row else None
+
+    def list_relationships(self, entity_name: str = None, status: str = None) -> List[Dict]:
+        with get_db() as db:
+            q = db.query(OntologyRelationship)
+            if entity_name:
+                q = q.filter(
+                    (OntologyRelationship.from_entity == entity_name)
+                    | (OntologyRelationship.to_entity == entity_name)
+                )
+            if status:
+                q = q.filter(OntologyRelationship.status == status)
+            return [r.to_dict() for r in q.order_by(OntologyRelationship.created_at).all()]
+
+    def update_relationship(self, rel_id: str, updates: Dict) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyRelationship).filter(OntologyRelationship.id == rel_id).first()
+            if not row:
+                return None
+            for key, value in updates.items():
+                if hasattr(row, key) and key not in ("id", "created_at"):
+                    setattr(row, key, value)
+            return row.to_dict()
+
+    def delete_relationship(self, rel_id: str) -> bool:
+        with get_db() as db:
+            deleted = db.query(OntologyRelationship).filter(OntologyRelationship.id == rel_id).delete()
+            return deleted > 0
+
+    # ------------------------------------------------------------------
+    # Ontology Metric CRUD
+    # ------------------------------------------------------------------
+
+    def save_metric(self, metric: Dict) -> Dict:
+        now = datetime.now(timezone.utc).isoformat()
+        with get_db() as db:
+            row = OntologyMetric(
+                id=metric["id"],
+                name=metric["name"],
+                display_name=metric["display_name"],
+                description=metric.get("description", ""),
+                entity_name=metric["entity_name"],
+                expression=metric["expression"],
+                format_type=metric.get("format_type", "number"),
+                status=metric.get("status", "active"),
+                proposed_by=metric.get("proposed_by", "user"),
+                created_at=metric.get("created_at", now),
+                updated_at=metric.get("updated_at"),
+            )
+            db.add(row)
+            return row.to_dict()
+
+    def get_metric(self, metric_id: str) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyMetric).filter(OntologyMetric.id == metric_id).first()
+            return row.to_dict() if row else None
+
+    def get_metric_by_name(self, name: str) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyMetric).filter(OntologyMetric.name == name).first()
+            return row.to_dict() if row else None
+
+    def list_metrics(self, entity_name: str = None, status: str = None) -> List[Dict]:
+        with get_db() as db:
+            q = db.query(OntologyMetric)
+            if entity_name:
+                q = q.filter(OntologyMetric.entity_name == entity_name)
+            if status:
+                q = q.filter(OntologyMetric.status == status)
+            return [r.to_dict() for r in q.order_by(OntologyMetric.created_at).all()]
+
+    def update_metric(self, metric_id: str, updates: Dict) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyMetric).filter(OntologyMetric.id == metric_id).first()
+            if not row:
+                return None
+            for key, value in updates.items():
+                if hasattr(row, key) and key not in ("id", "created_at"):
+                    setattr(row, key, value)
+            row.updated_at = datetime.now(timezone.utc).isoformat()
+            return row.to_dict()
+
+    def delete_metric(self, metric_id: str) -> bool:
+        with get_db() as db:
+            deleted = db.query(OntologyMetric).filter(OntologyMetric.id == metric_id).delete()
+            return deleted > 0
+
+    # ------------------------------------------------------------------
+    # Ontology Dimension CRUD
+    # ------------------------------------------------------------------
+
+    def save_dimension(self, dim: Dict) -> Dict:
+        now = datetime.now(timezone.utc).isoformat()
+        with get_db() as db:
+            row = OntologyDimension(
+                id=dim["id"],
+                name=dim["name"],
+                display_name=dim["display_name"],
+                description=dim.get("description", ""),
+                entity_name=dim["entity_name"],
+                expression=dim["expression"],
+                dimension_type=dim.get("dimension_type", "direct"),
+                status=dim.get("status", "active"),
+                proposed_by=dim.get("proposed_by", "user"),
+                created_at=dim.get("created_at", now),
+                updated_at=dim.get("updated_at"),
+            )
+            db.add(row)
+            return row.to_dict()
+
+    def get_dimension(self, dim_id: str) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyDimension).filter(OntologyDimension.id == dim_id).first()
+            return row.to_dict() if row else None
+
+    def get_dimension_by_name(self, name: str) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyDimension).filter(OntologyDimension.name == name).first()
+            return row.to_dict() if row else None
+
+    def list_dimensions(self, entity_name: str = None, status: str = None) -> List[Dict]:
+        with get_db() as db:
+            q = db.query(OntologyDimension)
+            if entity_name:
+                q = q.filter(OntologyDimension.entity_name == entity_name)
+            if status:
+                q = q.filter(OntologyDimension.status == status)
+            return [r.to_dict() for r in q.order_by(OntologyDimension.created_at).all()]
+
+    def update_dimension(self, dim_id: str, updates: Dict) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyDimension).filter(OntologyDimension.id == dim_id).first()
+            if not row:
+                return None
+            for key, value in updates.items():
+                if hasattr(row, key) and key not in ("id", "created_at"):
+                    setattr(row, key, value)
+            row.updated_at = datetime.now(timezone.utc).isoformat()
+            return row.to_dict()
+
+    def delete_dimension(self, dim_id: str) -> bool:
+        with get_db() as db:
+            deleted = db.query(OntologyDimension).filter(OntologyDimension.id == dim_id).delete()
+            return deleted > 0
+
+    # ------------------------------------------------------------------
+    # Ontology Proposal CRUD
+    # ------------------------------------------------------------------
+
+    def save_proposal(self, proposal: Dict) -> Dict:
+        now = datetime.now(timezone.utc).isoformat()
+        with get_db() as db:
+            row = OntologyProposal(
+                id=proposal["id"],
+                proposal_type=proposal["proposal_type"],
+                source_pipeline_id=proposal.get("source_pipeline_id"),
+                proposed_by=proposal.get("proposed_by", "ai"),
+                status=proposal.get("status", "pending"),
+                reviewed_by=proposal.get("reviewed_by"),
+                reviewed_at=proposal.get("reviewed_at"),
+                review_notes=proposal.get("review_notes"),
+                created_at=proposal.get("created_at", now),
+            )
+            row.payload = proposal["payload"]
+            db.add(row)
+            return row.to_dict()
+
+    def get_proposal(self, proposal_id: str) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyProposal).filter(OntologyProposal.id == proposal_id).first()
+            return row.to_dict() if row else None
+
+    def list_proposals(self, status: str = None, proposal_type: str = None) -> List[Dict]:
+        with get_db() as db:
+            q = db.query(OntologyProposal)
+            if status:
+                q = q.filter(OntologyProposal.status == status)
+            if proposal_type:
+                q = q.filter(OntologyProposal.proposal_type == proposal_type)
+            return [r.to_dict() for r in q.order_by(OntologyProposal.created_at).all()]
+
+    def update_proposal(self, proposal_id: str, updates: Dict) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(OntologyProposal).filter(OntologyProposal.id == proposal_id).first()
+            if not row:
+                return None
+            if "payload" in updates:
+                row.payload = updates.pop("payload")
+            for key, value in updates.items():
+                if hasattr(row, key) and key not in ("id", "created_at"):
+                    setattr(row, key, value)
+            return row.to_dict()
+
+    # ------------------------------------------------------------------
+    # Ontology Snapshot
+    # ------------------------------------------------------------------
+
+    def get_ontology_snapshot(self) -> Dict:
+        return {
+            "entities": self.list_entities(status="active"),
+            "relationships": self.list_relationships(status="active"),
+            "metrics": self.list_metrics(status="active"),
+            "dimensions": self.list_dimensions(status="active"),
+        }

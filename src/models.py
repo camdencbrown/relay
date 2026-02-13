@@ -219,3 +219,179 @@ class APIKey(Base):
     description = Column(String, default="")
     active = Column(Boolean, default=True)
     created_at = Column(String, nullable=False)
+
+
+# ------------------------------------------------------------------
+# Ontology Models
+# ------------------------------------------------------------------
+
+
+class OntologyEntity(Base):
+    __tablename__ = "ontology_entities"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False, unique=True, index=True)
+    display_name = Column(String, nullable=False)
+    description = Column(Text, default="")
+    pipeline_id = Column(String, nullable=False, index=True)
+    column_annotations_json = Column(Text, default="{}")
+    status = Column(String, default="active")
+    proposed_by = Column(String, default="user")
+    approved_by = Column(String, nullable=True)
+    approved_at = Column(String, nullable=True)
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=True)
+
+    @property
+    def column_annotations(self) -> dict:
+        return json.loads(self.column_annotations_json) if self.column_annotations_json else {}
+
+    @column_annotations.setter
+    def column_annotations(self, value: dict):
+        self.column_annotations_json = json.dumps(value)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "display_name": self.display_name,
+            "description": self.description,
+            "pipeline_id": self.pipeline_id,
+            "column_annotations": self.column_annotations,
+            "status": self.status,
+            "proposed_by": self.proposed_by,
+            "approved_by": self.approved_by,
+            "approved_at": self.approved_at,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+
+class OntologyRelationship(Base):
+    __tablename__ = "ontology_relationships"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False, unique=True)
+    from_entity = Column(String, nullable=False)
+    to_entity = Column(String, nullable=False)
+    from_column = Column(String, nullable=False)
+    to_column = Column(String, nullable=False)
+    relationship_type = Column(String, default="one_to_many")
+    description = Column(Text, default="")
+    status = Column(String, default="active")
+    proposed_by = Column(String, default="user")
+    created_at = Column(String, nullable=False)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "from_entity": self.from_entity,
+            "to_entity": self.to_entity,
+            "from_column": self.from_column,
+            "to_column": self.to_column,
+            "relationship_type": self.relationship_type,
+            "description": self.description,
+            "status": self.status,
+            "proposed_by": self.proposed_by,
+            "created_at": self.created_at,
+        }
+
+
+class OntologyMetric(Base):
+    __tablename__ = "ontology_metrics"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False, unique=True)
+    display_name = Column(String, nullable=False)
+    description = Column(Text, default="")
+    entity_name = Column(String, nullable=False)
+    expression = Column(Text, nullable=False)
+    format_type = Column(String, default="number")
+    status = Column(String, default="active")
+    proposed_by = Column(String, default="user")
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=True)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "display_name": self.display_name,
+            "description": self.description,
+            "entity_name": self.entity_name,
+            "expression": self.expression,
+            "format_type": self.format_type,
+            "status": self.status,
+            "proposed_by": self.proposed_by,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+
+class OntologyDimension(Base):
+    __tablename__ = "ontology_dimensions"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False, unique=True)
+    display_name = Column(String, nullable=False)
+    description = Column(Text, default="")
+    entity_name = Column(String, nullable=False)
+    expression = Column(Text, nullable=False)
+    dimension_type = Column(String, default="direct")
+    status = Column(String, default="active")
+    proposed_by = Column(String, default="user")
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=True)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "display_name": self.display_name,
+            "description": self.description,
+            "entity_name": self.entity_name,
+            "expression": self.expression,
+            "dimension_type": self.dimension_type,
+            "status": self.status,
+            "proposed_by": self.proposed_by,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+
+class OntologyProposal(Base):
+    __tablename__ = "ontology_proposals"
+
+    id = Column(String, primary_key=True)
+    proposal_type = Column(String, nullable=False)
+    payload_json = Column(Text, nullable=False)
+    source_pipeline_id = Column(String, nullable=True)
+    proposed_by = Column(String, default="ai")
+    status = Column(String, default="pending")
+    reviewed_by = Column(String, nullable=True)
+    reviewed_at = Column(String, nullable=True)
+    review_notes = Column(Text, nullable=True)
+    created_at = Column(String, nullable=False)
+
+    @property
+    def payload(self) -> dict:
+        return json.loads(self.payload_json) if self.payload_json else {}
+
+    @payload.setter
+    def payload(self, value: dict):
+        self.payload_json = json.dumps(value)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "proposal_type": self.proposal_type,
+            "payload": self.payload,
+            "source_pipeline_id": self.source_pipeline_id,
+            "proposed_by": self.proposed_by,
+            "status": self.status,
+            "reviewed_by": self.reviewed_by,
+            "reviewed_at": self.reviewed_at,
+            "review_notes": self.review_notes,
+            "created_at": self.created_at,
+        }
