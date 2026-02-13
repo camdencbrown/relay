@@ -53,6 +53,12 @@ async def get_capabilities():
             "query": "POST /api/v1/query",
             "schema": "POST /api/v1/schema",
             "export": "POST /api/v1/export",
+            "connection_create": "POST /api/v1/connection/create",
+            "connection_list": "GET /api/v1/connection/list",
+            "connection_get": "GET /api/v1/connection/{id}",
+            "connection_update": "PUT /api/v1/connection/{id}",
+            "connection_delete": "DELETE /api/v1/connection/{id}",
+            "connection_test": "POST /api/v1/connection/{id}/test",
         },
         "sources": [
             {"type": "csv_url", "description": "Fetch CSV from public URL"},
@@ -73,14 +79,50 @@ async def get_capabilities():
                 },
             }
         ],
+        "connections": {
+            "description": "Named, encrypted credential stores. Create once, reference by name in pipelines.",
+            "supported_types": ["mysql", "postgres", "salesforce", "rest_api", "domo", "servicenow", "s3"],
+            "workflow": [
+                "1. Create connection: POST /connection/create with name, type, credentials",
+                "2. Test connection: POST /connection/{id}/test",
+                "3. Use in pipeline: set source.connection = 'connection-name' instead of inline credentials",
+            ],
+            "security": [
+                "Credentials encrypted at rest with Fernet (AES-128-CBC + HMAC)",
+                "Credentials never returned by any API endpoint",
+                "Decrypted only in memory during pipeline execution",
+                "Encryption key from environment variable, not in code or database",
+            ],
+            "example_create": {
+                "name": "prod-mysql",
+                "type": "mysql",
+                "description": "Production MySQL database",
+                "credentials": {
+                    "host": "db.example.com",
+                    "port": 3306,
+                    "username": "readonly",
+                    "password": "secret",
+                    "database": "analytics",
+                },
+            },
+            "example_pipeline_usage": {
+                "source": {
+                    "type": "mysql",
+                    "connection": "prod-mysql",
+                    "query": "SELECT * FROM orders WHERE created_at > '2024-01-01'",
+                },
+            },
+        },
         "scheduling": {
             "intervals": ["hourly", "daily", "weekly", "custom"],
             "example": {"schedule": {"enabled": True, "interval": "daily", "timezone": "UTC"}},
         },
         "getting_started": [
-            "1. Test source: POST /test/source",
-            "2. Create pipeline: POST /pipeline/create",
-            "3. Run pipeline: POST /pipeline/{id}/run",
-            "4. Query data: POST /query",
+            "1. (Optional) Create connection: POST /connection/create",
+            "2. (Optional) Test connection: POST /connection/{id}/test",
+            "3. Test source: POST /test/source",
+            "4. Create pipeline: POST /pipeline/create (use connection name or inline credentials)",
+            "5. Run pipeline: POST /pipeline/{id}/run",
+            "6. Query data: POST /query",
         ],
     }

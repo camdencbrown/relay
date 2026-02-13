@@ -5,6 +5,7 @@ Relay API routes
 from fastapi import APIRouter
 
 from .capabilities import router as capabilities_router
+from .connections import router as connections_router
 from .metadata import router as metadata_router
 from .pipelines import router as pipelines_router
 from .query import router as query_router
@@ -13,6 +14,7 @@ from .transformations import router as transformations_router
 
 api_router = APIRouter()
 api_router.include_router(capabilities_router)
+api_router.include_router(connections_router)
 api_router.include_router(pipelines_router)
 api_router.include_router(query_router)
 api_router.include_router(metadata_router)

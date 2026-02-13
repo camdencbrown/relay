@@ -14,6 +14,12 @@ os.environ["AWS_ACCESS_KEY_ID"] = ""
 os.environ["AWS_SECRET_ACCESS_KEY"] = ""
 os.environ["REQUIRE_AUTH"] = "false"
 os.environ["ANTHROPIC_API_KEY"] = ""
+os.environ["ENCRYPTION_KEY"] = "dGVzdC1lbmNyeXB0aW9uLWtleS0xMjM0NTY3ODk=  "  # will be overwritten below
+
+# Generate a valid Fernet key for tests
+from cryptography.fernet import Fernet
+
+os.environ["ENCRYPTION_KEY"] = Fernet.generate_key().decode()
 
 from src.config import Settings, get_settings
 from src.database import init_db, _get_engine, _get_session_factory

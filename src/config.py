@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     # AI
     anthropic_api_key: str = ""
 
+    # Encryption
+    encryption_key: str = ""
+
     # CORS
     cors_origins: str = "*"
 

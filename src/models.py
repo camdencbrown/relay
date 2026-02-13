@@ -178,6 +178,37 @@ class ColumnKnowledge(Base):
     verified_at = Column(String, nullable=True)
 
 
+class Connection(Base):
+    __tablename__ = "connections"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False, unique=True, index=True)
+    type = Column(String, nullable=False)
+    description = Column(String, default="")
+    credentials_encrypted = Column(Text, nullable=False)
+    last_tested_at = Column(String, nullable=True)
+    last_test_status = Column(String, nullable=True)
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=True)
+
+    def to_dict(self, include_credentials: bool = False) -> dict:
+        d = {
+            "id": self.id,
+            "name": self.name,
+            "type": self.type,
+            "description": self.description,
+            "last_tested_at": self.last_tested_at,
+            "last_test_status": self.last_test_status,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+        if include_credentials:
+            from .encryption import decrypt_dict
+
+            d["credentials"] = decrypt_dict(self.credentials_encrypted)
+        return d
+
+
 class APIKey(Base):
     __tablename__ = "api_keys"
 

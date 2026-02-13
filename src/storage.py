@@ -8,7 +8,8 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from .database import get_db
-from .models import ColumnKnowledge, DatasetMetadata, Pipeline, PipelineRun
+from .encryption import encrypt_dict
+from .models import ColumnKnowledge, Connection, DatasetMetadata, Pipeline, PipelineRun
 
 
 class Storage:
@@ -223,3 +224,70 @@ class Storage:
                 }
                 for row in rows
             }
+
+    # ------------------------------------------------------------------
+    # Connection CRUD
+    # ------------------------------------------------------------------
+
+    def save_connection(self, connection: Dict) -> Dict:
+        with get_db() as db:
+            row = Connection(
+                id=connection["id"],
+                name=connection["name"],
+                type=connection["type"],
+                description=connection.get("description", ""),
+                credentials_encrypted=encrypt_dict(connection["credentials"]),
+                created_at=connection.get("created_at", datetime.now(timezone.utc).isoformat()),
+            )
+            db.add(row)
+            return row.to_dict()
+
+    def get_connection(self, connection_id: str, include_credentials: bool = False) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(Connection).filter(Connection.id == connection_id).first()
+            if not row:
+                return None
+            return row.to_dict(include_credentials=include_credentials)
+
+    def get_connection_by_name(self, name: str, include_credentials: bool = False) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(Connection).filter(Connection.name == name).first()
+            if not row:
+                return None
+            return row.to_dict(include_credentials=include_credentials)
+
+    def list_connections(self) -> List[Dict]:
+        with get_db() as db:
+            rows = db.query(Connection).order_by(Connection.created_at).all()
+            return [row.to_dict() for row in rows]
+
+    def update_connection(self, connection_id: str, updates: Dict) -> Optional[Dict]:
+        with get_db() as db:
+            row = db.query(Connection).filter(Connection.id == connection_id).first()
+            if not row:
+                return None
+            if "credentials" in updates:
+                row.credentials_encrypted = encrypt_dict(updates.pop("credentials"))
+            if "description" in updates:
+                row.description = updates["description"]
+            if "last_tested_at" in updates:
+                row.last_tested_at = updates["last_tested_at"]
+            if "last_test_status" in updates:
+                row.last_test_status = updates["last_test_status"]
+            row.updated_at = datetime.now(timezone.utc).isoformat()
+            return row.to_dict()
+
+    def delete_connection(self, connection_id: str) -> bool:
+        with get_db() as db:
+            deleted = db.query(Connection).filter(Connection.id == connection_id).delete()
+            return deleted > 0
+
+    def list_pipelines_using_connection(self, connection_name: str) -> List[Dict]:
+        with get_db() as db:
+            rows = db.query(Pipeline).all()
+            result = []
+            for row in rows:
+                source = row.source
+                if source.get("connection") == connection_name:
+                    result.append(row.to_dict())
+            return result

@@ -5,12 +5,13 @@ Extracted from api.py
 
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class SourceConfig(BaseModel):
     type: str = Field(..., description="Source type: csv_url, json_url, synthetic, mysql, postgres, rest_api, salesforce")
     url: Optional[str] = Field(None, description="URL to fetch data from")
+    connection: Optional[str] = Field(None, description="Named connection to use for credentials")
 
     model_config = {"extra": "allow"}
 
@@ -75,6 +76,7 @@ class TransformationSource(BaseModel):
     type: str
     url: Optional[str] = None
     alias: str
+    connection: Optional[str] = Field(None, description="Named connection to use for credentials")
 
     model_config = {"extra": "allow"}
 
@@ -98,3 +100,41 @@ class TransformationPipelineConfig(BaseModel):
     aggregate: Optional[AggregateConfig] = None
     destination: DestinationConfig
     schedule: Optional[ScheduleConfig] = None
+
+
+# ------------------------------------------------------------------
+# Connection schemas
+# ------------------------------------------------------------------
+
+VALID_CONNECTION_TYPES = {"mysql", "postgres", "salesforce", "rest_api", "domo", "servicenow", "s3"}
+
+
+class CreateConnectionRequest(BaseModel):
+    name: str = Field(..., description="Connection name (alphanumeric, hyphens, underscores)")
+    type: str = Field(..., description="Connection type: mysql, postgres, salesforce, rest_api, etc.")
+    description: Optional[str] = Field(None, description="Human-readable description")
+    credentials: Dict = Field(..., description="Credentials for the connection")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        import re
+
+        if not re.match(r"^[a-zA-Z][a-zA-Z0-9_-]{1,62}$", v):
+            raise ValueError(
+                "Name must start with a letter, contain only letters/numbers/hyphens/underscores, "
+                "and be 2-63 characters long."
+            )
+        return v
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, v: str) -> str:
+        if v not in VALID_CONNECTION_TYPES:
+            raise ValueError(f"Invalid connection type '{v}'. Must be one of: {sorted(VALID_CONNECTION_TYPES)}")
+        return v
+
+
+class UpdateConnectionRequest(BaseModel):
+    description: Optional[str] = None
+    credentials: Optional[Dict] = None

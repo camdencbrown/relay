@@ -111,3 +111,120 @@ def test_get_nonexistent_pipeline(storage):
 
 def test_get_nonexistent_metadata(storage):
     assert storage.get_metadata("nonexistent") is None
+
+
+# ------------------------------------------------------------------
+# Connection CRUD
+# ------------------------------------------------------------------
+
+
+def test_save_and_get_connection(storage):
+    conn = {
+        "id": "conn-test1",
+        "name": "my-mysql",
+        "type": "mysql",
+        "credentials": {"host": "localhost", "username": "root", "password": "secret", "database": "db"},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    result = storage.save_connection(conn)
+    assert result["name"] == "my-mysql"
+    assert "credentials" not in result  # not included by default
+
+    # Get without credentials
+    fetched = storage.get_connection("conn-test1")
+    assert fetched is not None
+    assert fetched["name"] == "my-mysql"
+    assert "credentials" not in fetched
+
+    # Get with credentials
+    fetched_full = storage.get_connection("conn-test1", include_credentials=True)
+    assert fetched_full["credentials"]["password"] == "secret"
+
+
+def test_get_connection_by_name(storage):
+    storage.save_connection({
+        "id": "conn-byname",
+        "name": "prod-pg",
+        "type": "postgres",
+        "credentials": {"host": "pg.example.com", "password": "pw"},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    result = storage.get_connection_by_name("prod-pg", include_credentials=True)
+    assert result is not None
+    assert result["credentials"]["host"] == "pg.example.com"
+
+    assert storage.get_connection_by_name("nonexistent") is None
+
+
+def test_list_connections(storage):
+    for i in range(3):
+        storage.save_connection({
+            "id": f"conn-list-{i}",
+            "name": f"conn-{i}",
+            "type": "mysql",
+            "credentials": {"host": f"host-{i}"},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    conns = storage.list_connections()
+    assert len(conns) == 3
+    for c in conns:
+        assert "credentials" not in c
+
+
+def test_update_connection(storage):
+    storage.save_connection({
+        "id": "conn-upd",
+        "name": "upd-conn",
+        "type": "mysql",
+        "credentials": {"host": "old", "password": "old-pw"},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    result = storage.update_connection("conn-upd", {
+        "description": "Updated",
+        "credentials": {"host": "new", "password": "new-pw"},
+    })
+    assert result["description"] == "Updated"
+    assert result["updated_at"] is not None
+
+    # Verify credentials were re-encrypted
+    full = storage.get_connection("conn-upd", include_credentials=True)
+    assert full["credentials"]["password"] == "new-pw"
+
+
+def test_delete_connection(storage):
+    storage.save_connection({
+        "id": "conn-del",
+        "name": "del-conn",
+        "type": "postgres",
+        "credentials": {"host": "h"},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    assert storage.delete_connection("conn-del") is True
+    assert storage.get_connection("conn-del") is None
+    assert storage.delete_connection("conn-del") is False
+
+
+def test_list_pipelines_using_connection(storage):
+    storage.save_pipeline({
+        "id": "pipe-conn1",
+        "name": "Uses Connection",
+        "source": {"type": "mysql", "connection": "my-conn"},
+        "destination": {"type": "s3", "bucket": "b", "path": "p/"},
+        "options": {},
+        "schedule": {},
+        "status": "active",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    storage.save_pipeline({
+        "id": "pipe-noconn",
+        "name": "No Connection",
+        "source": {"type": "csv_url", "url": "http://example.com"},
+        "destination": {"type": "s3", "bucket": "b", "path": "p/"},
+        "options": {},
+        "schedule": {},
+        "status": "active",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    using = storage.list_pipelines_using_connection("my-conn")
+    assert len(using) == 1
+    assert using[0]["name"] == "Uses Connection"

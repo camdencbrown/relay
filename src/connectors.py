@@ -36,8 +36,37 @@ class ConnectorRegistry:
         return decorator
 
     @classmethod
+    def _resolve_connection(cls, source: Dict) -> Dict:
+        """If source references a named connection, look it up, decrypt, and merge credentials."""
+        connection_name = source.get("connection")
+        if not connection_name:
+            return source
+
+        from .storage import Storage
+
+        storage = Storage()
+        conn = storage.get_connection_by_name(connection_name, include_credentials=True)
+        if not conn:
+            raise ValueError(f"Connection '{connection_name}' not found")
+
+        if conn["type"] != source["type"]:
+            raise ValueError(
+                f"Connection type mismatch: connection '{connection_name}' is type '{conn['type']}' "
+                f"but source specifies type '{source['type']}'"
+            )
+
+        merged = dict(source)
+        merged.pop("connection")
+        # Connection credentials are the base; source fields override
+        for key, value in conn["credentials"].items():
+            if key not in merged:
+                merged[key] = value
+        return merged
+
+    @classmethod
     def fetch_source(cls, source: Dict) -> pd.DataFrame:
         """Fetch data from any registered source type."""
+        source = cls._resolve_connection(source)
         source_type = source["type"]
         handler = cls._HANDLERS.get(source_type)
         if not handler:
@@ -47,6 +76,7 @@ class ConnectorRegistry:
     @classmethod
     def fetch_source_streaming(cls, source: Dict, chunk_size: int = 10000) -> Iterator[pd.DataFrame]:
         """Fetch data from any registered streaming source type."""
+        source = cls._resolve_connection(source)
         source_type = source["type"]
         handler = cls._STREAMING_HANDLERS.get(source_type)
         if handler:
@@ -59,6 +89,56 @@ class ConnectorRegistry:
     @classmethod
     def supported_types(cls) -> list:
         return sorted(set(list(cls._HANDLERS.keys()) + list(cls._STREAMING_HANDLERS.keys())))
+
+    @classmethod
+    def test_connection(cls, conn_type: str, credentials: Dict) -> Dict:
+        """Test connectivity for a given connection type and credentials."""
+        try:
+            if conn_type == "mysql":
+                conn_str = (
+                    f"mysql+pymysql://{credentials['username']}:{credentials['password']}"
+                    f"@{credentials['host']}:{credentials.get('port', 3306)}/{credentials['database']}"
+                )
+                engine = create_engine(conn_str)
+                with engine.connect() as conn:
+                    conn.execute(pd.io.sql.text("SELECT 1"))
+                engine.dispose()
+                return {"status": "success", "message": "Connected to MySQL successfully"}
+
+            elif conn_type == "postgres":
+                conn_str = (
+                    f"postgresql://{credentials['username']}:{credentials['password']}"
+                    f"@{credentials['host']}:{credentials.get('port', 5432)}/{credentials['database']}"
+                )
+                engine = create_engine(conn_str)
+                with engine.connect() as conn:
+                    conn.execute(pd.io.sql.text("SELECT 1"))
+                engine.dispose()
+                return {"status": "success", "message": "Connected to PostgreSQL successfully"}
+
+            elif conn_type == "salesforce":
+                from simple_salesforce import Salesforce
+
+                Salesforce(
+                    username=credentials["username"],
+                    password=credentials["password"],
+                    security_token=credentials.get("security_token", ""),
+                    domain=credentials.get("domain", "login"),
+                )
+                return {"status": "success", "message": "Authenticated with Salesforce successfully"}
+
+            elif conn_type == "rest_api":
+                url = credentials.get("base_url") or credentials.get("url", "")
+                if url:
+                    resp = requests.get(url, timeout=10)
+                    return {"status": "success", "message": f"Reachable (HTTP {resp.status_code})"}
+                return {"status": "success", "message": "Credentials stored (no base_url to ping)"}
+
+            else:
+                return {"status": "success", "message": f"Credentials stored for {conn_type} (no live test available)"}
+
+        except Exception as e:
+            return {"status": "failed", "message": str(e)}
 
 
 # ---------------------------------------------------------------------------
