@@ -73,6 +73,7 @@ async def get_capabilities():
             {"type": "mysql", "description": "MySQL database source"},
             {"type": "postgres", "description": "PostgreSQL database source"},
             {"type": "salesforce", "description": "Salesforce SOQL source"},
+            {"type": "domo", "description": "Domo dataset (by dataset_id, CSV export or SQL query)"},
             {"type": "synthetic", "description": "Generate test data"},
         ],
         "destinations": [

@@ -127,6 +127,18 @@ class ConnectorRegistry:
                 )
                 return {"status": "success", "message": "Authenticated with Salesforce successfully"}
 
+            elif conn_type == "domo":
+                token = _domo_get_token(credentials["client_id"], credentials["client_secret"])
+                # Verify token by listing datasets (limit 1)
+                resp = requests.get(
+                    "https://api.domo.com/v1/datasets",
+                    headers={"Authorization": f"Bearer {token}"},
+                    params={"limit": 1},
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                return {"status": "success", "message": "Authenticated with Domo successfully"}
+
             elif conn_type == "rest_api":
                 url = credentials.get("base_url") or credentials.get("url", "")
                 if url:
@@ -296,6 +308,99 @@ def _fetch_salesforce_streaming(source: Dict, chunk_size: int) -> Iterator[pd.Da
     df = _fetch_salesforce(source)
     for i in range(0, len(df), chunk_size):
         yield df.iloc[i : i + chunk_size]
+
+
+# ---------------------------------------------------------------------------
+# Domo
+# ---------------------------------------------------------------------------
+
+
+def _domo_get_token(client_id: str, client_secret: str) -> str:
+    """Exchange Domo client credentials for an OAuth2 access token."""
+    resp = requests.get(
+        "https://api.domo.com/oauth/token",
+        params={"grant_type": "client_credentials", "scope": "data"},
+        auth=(client_id, client_secret),
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()["access_token"]
+
+
+@ConnectorRegistry.register("domo")
+def _fetch_domo(source: Dict) -> pd.DataFrame:
+    """Fetch a Domo dataset as CSV. Works for datasets up to ~1M rows."""
+    client_id = source.get("client_id") or source.get("domo_client_id")
+    client_secret = source.get("client_secret") or source.get("domo_client_secret")
+    dataset_id = source["dataset_id"]
+
+    if not client_id or not client_secret:
+        raise ValueError("Domo source requires 'client_id' and 'client_secret' (or use a named connection)")
+
+    token = _domo_get_token(client_id, client_secret)
+
+    # Check if a SQL query is specified (uses Query API, returns JSON)
+    sql = source.get("query")
+    if sql:
+        resp = requests.post(
+            f"https://api.domo.com/v1/datasets/query/execute/{dataset_id}",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={"sql": sql},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        columns = [col["name"] for col in data.get("columns", [])]
+        return pd.DataFrame(data.get("rows", []), columns=columns)
+
+    # Default: full CSV export
+    resp = requests.get(
+        f"https://api.domo.com/v1/datasets/{dataset_id}/data",
+        headers={"Authorization": f"Bearer {token}", "Accept": "text/csv"},
+        params={"includeHeader": "true"},
+        timeout=300,
+    )
+    resp.raise_for_status()
+    return pd.read_csv(StringIO(resp.text))
+
+
+@ConnectorRegistry.register("domo", streaming=True)
+def _fetch_domo_streaming(source: Dict, chunk_size: int) -> Iterator[pd.DataFrame]:
+    """Fetch a Domo dataset in chunks using the Query API with LIMIT/OFFSET pagination."""
+    client_id = source.get("client_id") or source.get("domo_client_id")
+    client_secret = source.get("client_secret") or source.get("domo_client_secret")
+    dataset_id = source["dataset_id"]
+
+    if not client_id or not client_secret:
+        raise ValueError("Domo source requires 'client_id' and 'client_secret' (or use a named connection)")
+
+    token = _domo_get_token(client_id, client_secret)
+    offset = 0
+    columns = None
+
+    while True:
+        sql = f"SELECT * FROM table LIMIT {chunk_size} OFFSET {offset}"
+        resp = requests.post(
+            f"https://api.domo.com/v1/datasets/query/execute/{dataset_id}",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={"sql": sql},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        if columns is None:
+            columns = [col["name"] for col in data.get("columns", [])]
+
+        rows = data.get("rows", [])
+        if not rows:
+            break
+
+        yield pd.DataFrame(rows, columns=columns)
+        offset += chunk_size
+
+        if len(rows) < chunk_size:
+            break
 
 
 # ---------------------------------------------------------------------------
