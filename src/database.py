@@ -37,8 +37,24 @@ def _get_session_factory():
 
 
 def init_db() -> None:
-    """Create all tables. Safe to call multiple times."""
-    Base.metadata.create_all(bind=_get_engine())
+    """Create all tables and run lightweight migrations. Safe to call multiple times."""
+    engine = _get_engine()
+    Base.metadata.create_all(bind=engine)
+    _run_migrations(engine)
+
+
+def _run_migrations(engine) -> None:
+    """Add columns that create_all doesn't handle on existing tables."""
+    import sqlalchemy
+
+    with engine.connect() as conn:
+        inspector = sqlalchemy.inspect(engine)
+        # Add 'role' column to api_keys if missing (added in v2.1)
+        if "api_keys" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("api_keys")]
+            if "role" not in columns:
+                conn.execute(sqlalchemy.text("ALTER TABLE api_keys ADD COLUMN role TEXT DEFAULT 'writer'"))
+                conn.commit()
 
 
 @contextmanager

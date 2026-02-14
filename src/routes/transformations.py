@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..auth import require_api_key
+from ..auth import require_role
 from ..pipeline import PipelineEngine
 from ..schemas import TransformationPipelineConfig
 from ..storage import Storage
@@ -23,7 +23,7 @@ _transform_engine = TransformationEngine(_engine)
 @router.post("/pipeline/create-transformation")
 async def create_transformation_pipeline(
     config: TransformationPipelineConfig,
-    _key: str = Depends(require_api_key),
+    _key: str = Depends(require_role("writer")),
 ):
     pipeline_id = f"pipe-{uuid.uuid4().hex[:8]}"
 

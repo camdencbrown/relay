@@ -27,6 +27,13 @@ async def query_data(request: QueryRequest):
             sql=request.sql,
             limit=request.limit,
         )
+        _storage.record_event(
+            "query_executed",
+            metadata={
+                "row_count": result["row_count"],
+                "execution_time_ms": result["execution_time_ms"],
+            },
+        )
 
         hints = []
         if result["row_count"] == 0:

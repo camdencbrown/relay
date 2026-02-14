@@ -79,3 +79,66 @@ def test_unsupported_type():
 
     with pytest.raises(ValueError, match="Unsupported source type"):
         ConnectorRegistry.fetch_source({"type": "unknown_type"})
+
+
+# ---------------------------------------------------------------------------
+# Connection resolution tests
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_connection_passthrough():
+    """Source without connection key passes through unchanged."""
+    source = {"type": "csv_url", "url": "http://example.com/data.csv"}
+    result = ConnectorRegistry._resolve_connection(source)
+    assert result == source
+
+
+def test_resolve_connection_merge():
+    """Connection credentials merge into source dict."""
+    from src.storage import Storage
+
+    storage = Storage()
+    storage.save_connection({
+        "id": "conn-res1",
+        "name": "resolve-test",
+        "type": "mysql",
+        "credentials": {"host": "db.example.com", "username": "user", "password": "pw", "database": "mydb"},
+    })
+
+    source = {"type": "mysql", "connection": "resolve-test", "query": "SELECT 1"}
+    result = ConnectorRegistry._resolve_connection(source)
+
+    assert result["host"] == "db.example.com"
+    assert result["username"] == "user"
+    assert result["password"] == "pw"
+    assert result["database"] == "mydb"
+    assert result["query"] == "SELECT 1"
+    assert "connection" not in result
+
+
+def test_resolve_connection_not_found():
+    """Missing connection raises ValueError."""
+    import pytest
+
+    source = {"type": "mysql", "connection": "nonexistent"}
+    with pytest.raises(ValueError, match="not found"):
+        ConnectorRegistry._resolve_connection(source)
+
+
+def test_resolve_connection_type_mismatch():
+    """Type mismatch between connection and source raises ValueError."""
+    import pytest
+
+    from src.storage import Storage
+
+    storage = Storage()
+    storage.save_connection({
+        "id": "conn-mis",
+        "name": "pg-conn",
+        "type": "postgres",
+        "credentials": {"host": "h", "username": "u", "password": "p", "database": "d"},
+    })
+
+    source = {"type": "mysql", "connection": "pg-conn"}
+    with pytest.raises(ValueError, match="type mismatch"):
+        ConnectorRegistry._resolve_connection(source)

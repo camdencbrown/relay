@@ -36,8 +36,37 @@ class ConnectorRegistry:
         return decorator
 
     @classmethod
+    def _resolve_connection(cls, source: Dict) -> Dict:
+        """If source references a named connection, look it up, decrypt, and merge credentials."""
+        connection_name = source.get("connection")
+        if not connection_name:
+            return source
+
+        from .storage import Storage
+
+        storage = Storage()
+        conn = storage.get_connection_by_name(connection_name, include_credentials=True)
+        if not conn:
+            raise ValueError(f"Connection '{connection_name}' not found")
+
+        if conn["type"] != source["type"]:
+            raise ValueError(
+                f"Connection type mismatch: connection '{connection_name}' is type '{conn['type']}' "
+                f"but source specifies type '{source['type']}'"
+            )
+
+        merged = dict(source)
+        merged.pop("connection")
+        # Connection credentials are the base; source fields override
+        for key, value in conn["credentials"].items():
+            if key not in merged:
+                merged[key] = value
+        return merged
+
+    @classmethod
     def fetch_source(cls, source: Dict) -> pd.DataFrame:
         """Fetch data from any registered source type."""
+        source = cls._resolve_connection(source)
         source_type = source["type"]
         handler = cls._HANDLERS.get(source_type)
         if not handler:
@@ -47,6 +76,7 @@ class ConnectorRegistry:
     @classmethod
     def fetch_source_streaming(cls, source: Dict, chunk_size: int = 10000) -> Iterator[pd.DataFrame]:
         """Fetch data from any registered streaming source type."""
+        source = cls._resolve_connection(source)
         source_type = source["type"]
         handler = cls._STREAMING_HANDLERS.get(source_type)
         if handler:
@@ -59,6 +89,68 @@ class ConnectorRegistry:
     @classmethod
     def supported_types(cls) -> list:
         return sorted(set(list(cls._HANDLERS.keys()) + list(cls._STREAMING_HANDLERS.keys())))
+
+    @classmethod
+    def test_connection(cls, conn_type: str, credentials: Dict) -> Dict:
+        """Test connectivity for a given connection type and credentials."""
+        try:
+            if conn_type == "mysql":
+                conn_str = (
+                    f"mysql+pymysql://{credentials['username']}:{credentials['password']}"
+                    f"@{credentials['host']}:{credentials.get('port', 3306)}/{credentials['database']}"
+                )
+                engine = create_engine(conn_str)
+                with engine.connect() as conn:
+                    conn.execute(pd.io.sql.text("SELECT 1"))
+                engine.dispose()
+                return {"status": "success", "message": "Connected to MySQL successfully"}
+
+            elif conn_type == "postgres":
+                conn_str = (
+                    f"postgresql://{credentials['username']}:{credentials['password']}"
+                    f"@{credentials['host']}:{credentials.get('port', 5432)}/{credentials['database']}"
+                )
+                engine = create_engine(conn_str)
+                with engine.connect() as conn:
+                    conn.execute(pd.io.sql.text("SELECT 1"))
+                engine.dispose()
+                return {"status": "success", "message": "Connected to PostgreSQL successfully"}
+
+            elif conn_type == "salesforce":
+                from simple_salesforce import Salesforce
+
+                Salesforce(
+                    username=credentials["username"],
+                    password=credentials["password"],
+                    security_token=credentials.get("security_token", ""),
+                    domain=credentials.get("domain", "login"),
+                )
+                return {"status": "success", "message": "Authenticated with Salesforce successfully"}
+
+            elif conn_type == "domo":
+                token = _domo_get_token(credentials["client_id"], credentials["client_secret"])
+                # Verify token by listing datasets (limit 1)
+                resp = requests.get(
+                    "https://api.domo.com/v1/datasets",
+                    headers={"Authorization": f"Bearer {token}"},
+                    params={"limit": 1},
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                return {"status": "success", "message": "Authenticated with Domo successfully"}
+
+            elif conn_type == "rest_api":
+                url = credentials.get("base_url") or credentials.get("url", "")
+                if url:
+                    resp = requests.get(url, timeout=10)
+                    return {"status": "success", "message": f"Reachable (HTTP {resp.status_code})"}
+                return {"status": "success", "message": "Credentials stored (no base_url to ping)"}
+
+            else:
+                return {"status": "success", "message": f"Credentials stored for {conn_type} (no live test available)"}
+
+        except Exception as e:
+            return {"status": "failed", "message": str(e)}
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +308,99 @@ def _fetch_salesforce_streaming(source: Dict, chunk_size: int) -> Iterator[pd.Da
     df = _fetch_salesforce(source)
     for i in range(0, len(df), chunk_size):
         yield df.iloc[i : i + chunk_size]
+
+
+# ---------------------------------------------------------------------------
+# Domo
+# ---------------------------------------------------------------------------
+
+
+def _domo_get_token(client_id: str, client_secret: str) -> str:
+    """Exchange Domo client credentials for an OAuth2 access token."""
+    resp = requests.get(
+        "https://api.domo.com/oauth/token",
+        params={"grant_type": "client_credentials", "scope": "data"},
+        auth=(client_id, client_secret),
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()["access_token"]
+
+
+@ConnectorRegistry.register("domo")
+def _fetch_domo(source: Dict) -> pd.DataFrame:
+    """Fetch a Domo dataset as CSV. Works for datasets up to ~1M rows."""
+    client_id = source.get("client_id") or source.get("domo_client_id")
+    client_secret = source.get("client_secret") or source.get("domo_client_secret")
+    dataset_id = source["dataset_id"]
+
+    if not client_id or not client_secret:
+        raise ValueError("Domo source requires 'client_id' and 'client_secret' (or use a named connection)")
+
+    token = _domo_get_token(client_id, client_secret)
+
+    # Check if a SQL query is specified (uses Query API, returns JSON)
+    sql = source.get("query")
+    if sql:
+        resp = requests.post(
+            f"https://api.domo.com/v1/datasets/query/execute/{dataset_id}",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={"sql": sql},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        columns = [col["name"] for col in data.get("columns", [])]
+        return pd.DataFrame(data.get("rows", []), columns=columns)
+
+    # Default: full CSV export
+    resp = requests.get(
+        f"https://api.domo.com/v1/datasets/{dataset_id}/data",
+        headers={"Authorization": f"Bearer {token}", "Accept": "text/csv"},
+        params={"includeHeader": "true"},
+        timeout=300,
+    )
+    resp.raise_for_status()
+    return pd.read_csv(StringIO(resp.text))
+
+
+@ConnectorRegistry.register("domo", streaming=True)
+def _fetch_domo_streaming(source: Dict, chunk_size: int) -> Iterator[pd.DataFrame]:
+    """Fetch a Domo dataset in chunks using the Query API with LIMIT/OFFSET pagination."""
+    client_id = source.get("client_id") or source.get("domo_client_id")
+    client_secret = source.get("client_secret") or source.get("domo_client_secret")
+    dataset_id = source["dataset_id"]
+
+    if not client_id or not client_secret:
+        raise ValueError("Domo source requires 'client_id' and 'client_secret' (or use a named connection)")
+
+    token = _domo_get_token(client_id, client_secret)
+    offset = 0
+    columns = None
+
+    while True:
+        sql = f"SELECT * FROM table LIMIT {chunk_size} OFFSET {offset}"
+        resp = requests.post(
+            f"https://api.domo.com/v1/datasets/query/execute/{dataset_id}",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={"sql": sql},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        if columns is None:
+            columns = [col["name"] for col in data.get("columns", [])]
+
+        rows = data.get("rows", [])
+        if not rows:
+            break
+
+        yield pd.DataFrame(rows, columns=columns)
+        offset += chunk_size
+
+        if len(rows) < chunk_size:
+            break
 
 
 # ---------------------------------------------------------------------------

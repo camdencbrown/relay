@@ -22,9 +22,14 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite:///relay.db"
 
+    # Storage
+    storage_mode: str = "s3"  # "s3" or "local"
+    local_storage_path: str = "./relay_data"
+
     # AWS / S3
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
+    aws_session_token: str = ""
     aws_default_region: str = "us-west-1"
     s3_bucket_name: str = ""
 
@@ -33,6 +38,12 @@ class Settings(BaseSettings):
 
     # AI
     anthropic_api_key: str = ""
+
+    # Encryption
+    encryption_key: str = ""
+
+    # Ontology
+    ontology_auto_approve: bool = False
 
     # CORS
     cors_origins: str = "*"

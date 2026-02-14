@@ -12,6 +12,7 @@ from typing import Any, Dict, Iterator
 import pandas as pd
 
 from .connectors import PostgresWriter
+from .file_storage import write_file
 
 logger = logging.getLogger(__name__)
 
@@ -167,8 +168,7 @@ class StreamingPipeline:
         content = buffer.getvalue()
         if isinstance(content, str):
             content = content.encode()
-        self.s3_client.put_object(Bucket=bucket, Key=filename, Body=content)
-        return f"s3://{bucket}/{filename}"
+        return write_file(content, bucket, filename, s3_client=self.s3_client)
 
     # ----- Postgres -----
 

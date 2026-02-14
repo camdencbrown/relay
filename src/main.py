@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
 from .database import init_db
+from .file_storage import ensure_local_storage_dir
 from .logging_config import setup_logging
 from .pipeline import PipelineEngine
 from .routes import api_router
@@ -30,6 +31,7 @@ scheduler = PipelineScheduler(storage, engine)
 async def lifespan(app: FastAPI):
     setup_logging()
     init_db()
+    ensure_local_storage_dir()
     await scheduler.start()
     yield
     await scheduler.stop()
@@ -94,7 +96,7 @@ async def health():
         "components": {
             "database": "sqlite",
             "query_engine": "duckdb",
-            "storage": "s3",
+            "storage": settings.storage_mode,
         },
     }
 

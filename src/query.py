@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 
 import duckdb
 
+from .config import get_settings
 from .s3 import get_duckdb_s3_config
 from .storage import Storage
 from .utils import sanitize_table_name
@@ -26,19 +27,25 @@ class QueryEngine:
         start_time = datetime.now()
         conn = duckdb.connect(":memory:")
 
-        # Configure S3 access
-        s3_cfg = get_duckdb_s3_config()
-        if s3_cfg:
-            conn.execute(
-                f"""
-                CREATE SECRET secret1 (
-                    TYPE S3,
-                    KEY_ID '{s3_cfg["key_id"]}',
-                    SECRET '{s3_cfg["secret"]}',
-                    REGION '{s3_cfg["region"]}'
-                );
-                """
-            )
+        # Configure S3 access (only needed in S3 storage mode)
+        settings = get_settings()
+        if settings.storage_mode == "s3":
+            s3_cfg = get_duckdb_s3_config()
+            if s3_cfg:
+                session_token_line = ""
+                if s3_cfg.get("session_token"):
+                    session_token_line = f"SESSION_TOKEN '{s3_cfg['session_token']}',"
+                conn.execute(
+                    f"""
+                    CREATE SECRET secret1 (
+                        TYPE S3,
+                        KEY_ID '{s3_cfg["key_id"]}',
+                        SECRET '{s3_cfg["secret"]}',
+                        {session_token_line}
+                        REGION '{s3_cfg["region"]}'
+                    );
+                    """
+                )
 
         # Load pipeline data as views
         table_map = {}
