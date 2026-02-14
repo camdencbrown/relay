@@ -65,7 +65,10 @@ class OntologyManager:
             saved_prop = self.storage.save_proposal(prop_record)
 
             if auto_approve:
-                self._materialize_proposal(prop)
+                try:
+                    self._materialize_proposal(prop)
+                except Exception as e:
+                    logger.warning(f"Auto-approve failed for {prop['type']} proposal: {e}")
 
             saved.append(saved_prop)
 

@@ -1,11 +1,13 @@
 """
-Ontology CRUD routes, semantic query, and proposal management.
+Ontology CRUD routes, semantic query, lineage, and proposal management.
 """
 
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from ..auth import require_role
+from ..lineage import compute_lineage
 from ..ontology import OntologyManager
 from ..query import QueryEngine
 from ..schemas import (
@@ -51,7 +53,7 @@ async def get_ontology():
 
 
 @router.post("/entity")
-async def create_entity(req: CreateEntityRequest):
+async def create_entity(req: CreateEntityRequest, _key: str = Depends(require_role("writer"))):
     storage = _storage()
 
     # Validate pipeline exists
@@ -73,7 +75,9 @@ async def create_entity(req: CreateEntityRequest):
         "column_annotations": req.column_annotations or {},
         "status": "active",
     }
-    return storage.save_entity(entity)
+    result = storage.save_entity(entity)
+    storage.record_event("entity_created", entity_name=req.name, pipeline_id=req.pipeline_id)
+    return result
 
 
 @router.get("/entity/list")
@@ -98,7 +102,7 @@ async def get_entity_by_name(name: str):
 
 
 @router.put("/entity/{entity_id}")
-async def update_entity(entity_id: str, req: UpdateEntityRequest):
+async def update_entity(entity_id: str, req: UpdateEntityRequest, _key: str = Depends(require_role("writer"))):
     updates = req.model_dump(exclude_none=True)
     if not updates:
         raise HTTPException(status_code=400, detail="No updates provided")
@@ -109,7 +113,7 @@ async def update_entity(entity_id: str, req: UpdateEntityRequest):
 
 
 @router.delete("/entity/{entity_id}")
-async def delete_entity(entity_id: str):
+async def delete_entity(entity_id: str, _key: str = Depends(require_role("admin"))):
     if not _storage().delete_entity(entity_id):
         raise HTTPException(status_code=404, detail="Entity not found")
     return {"status": "deleted", "id": entity_id}
@@ -121,7 +125,7 @@ async def delete_entity(entity_id: str):
 
 
 @router.post("/relationship")
-async def create_relationship(req: CreateRelationshipRequest):
+async def create_relationship(req: CreateRelationshipRequest, _key: str = Depends(require_role("writer"))):
     storage = _storage()
 
     # Validate both entities exist and are active
@@ -152,7 +156,7 @@ async def list_relationships(entity: str = None):
 
 
 @router.delete("/relationship/{rel_id}")
-async def delete_relationship(rel_id: str):
+async def delete_relationship(rel_id: str, _key: str = Depends(require_role("admin"))):
     if not _storage().delete_relationship(rel_id):
         raise HTTPException(status_code=404, detail="Relationship not found")
     return {"status": "deleted", "id": rel_id}
@@ -164,7 +168,7 @@ async def delete_relationship(rel_id: str):
 
 
 @router.post("/metric")
-async def create_metric(req: CreateMetricRequest):
+async def create_metric(req: CreateMetricRequest, _key: str = Depends(require_role("writer"))):
     storage = _storage()
 
     entity = storage.get_entity_by_name(req.entity_name)
@@ -180,7 +184,9 @@ async def create_metric(req: CreateMetricRequest):
         "expression": req.expression,
         "format_type": req.format_type,
     }
-    return storage.save_metric(metric)
+    result = storage.save_metric(metric)
+    storage.record_event("metric_created", entity_name=req.entity_name)
+    return result
 
 
 @router.get("/metric/list")
@@ -189,7 +195,7 @@ async def list_metrics(entity: str = None):
 
 
 @router.put("/metric/{metric_id}")
-async def update_metric(metric_id: str, req: UpdateMetricRequest):
+async def update_metric(metric_id: str, req: UpdateMetricRequest, _key: str = Depends(require_role("writer"))):
     updates = req.model_dump(exclude_none=True)
     if not updates:
         raise HTTPException(status_code=400, detail="No updates provided")
@@ -200,7 +206,7 @@ async def update_metric(metric_id: str, req: UpdateMetricRequest):
 
 
 @router.delete("/metric/{metric_id}")
-async def delete_metric(metric_id: str):
+async def delete_metric(metric_id: str, _key: str = Depends(require_role("admin"))):
     if not _storage().delete_metric(metric_id):
         raise HTTPException(status_code=404, detail="Metric not found")
     return {"status": "deleted", "id": metric_id}
@@ -212,7 +218,7 @@ async def delete_metric(metric_id: str):
 
 
 @router.post("/dimension")
-async def create_dimension(req: CreateDimensionRequest):
+async def create_dimension(req: CreateDimensionRequest, _key: str = Depends(require_role("writer"))):
     storage = _storage()
 
     entity = storage.get_entity_by_name(req.entity_name)
@@ -228,7 +234,9 @@ async def create_dimension(req: CreateDimensionRequest):
         "expression": req.expression,
         "dimension_type": req.dimension_type,
     }
-    return storage.save_dimension(dim)
+    result = storage.save_dimension(dim)
+    storage.record_event("dimension_created", entity_name=req.entity_name)
+    return result
 
 
 @router.get("/dimension/list")
@@ -237,7 +245,7 @@ async def list_dimensions(entity: str = None):
 
 
 @router.put("/dimension/{dim_id}")
-async def update_dimension(dim_id: str, req: UpdateDimensionRequest):
+async def update_dimension(dim_id: str, req: UpdateDimensionRequest, _key: str = Depends(require_role("writer"))):
     updates = req.model_dump(exclude_none=True)
     if not updates:
         raise HTTPException(status_code=400, detail="No updates provided")
@@ -248,10 +256,25 @@ async def update_dimension(dim_id: str, req: UpdateDimensionRequest):
 
 
 @router.delete("/dimension/{dim_id}")
-async def delete_dimension(dim_id: str):
+async def delete_dimension(dim_id: str, _key: str = Depends(require_role("admin"))):
     if not _storage().delete_dimension(dim_id):
         raise HTTPException(status_code=404, detail="Dimension not found")
     return {"status": "deleted", "id": dim_id}
+
+
+# ------------------------------------------------------------------
+# Lineage
+# ------------------------------------------------------------------
+
+
+@router.get("/lineage/{entity_name}")
+async def get_lineage(entity_name: str):
+    """Compute lineage for an entity: entity→pipeline→source→metrics."""
+    storage = _storage()
+    lineage = compute_lineage(entity_name, storage)
+    if not lineage:
+        raise HTTPException(status_code=404, detail=f"Entity '{entity_name}' not found")
+    return lineage
 
 
 # ------------------------------------------------------------------
@@ -266,7 +289,9 @@ async def semantic_query(req: SemanticQueryRequest):
     semantic_engine = SemanticQueryEngine(storage, query_engine)
 
     try:
-        return semantic_engine.execute(req.model_dump(exclude_none=True))
+        result = semantic_engine.execute(req.model_dump(exclude_none=True))
+        storage.record_event("semantic_query_executed")
+        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -277,7 +302,7 @@ async def semantic_query(req: SemanticQueryRequest):
 
 
 @router.post("/propose")
-async def propose_ontology(req: ProposeOntologyRequest):
+async def propose_ontology(req: ProposeOntologyRequest, _key: str = Depends(require_role("writer"))):
     storage = _storage()
     manager = OntologyManager(storage)
 
@@ -287,6 +312,7 @@ async def propose_ontology(req: ProposeOntologyRequest):
             include_relationships=req.include_relationships,
             include_metrics=req.include_metrics,
         )
+        storage.record_event("ontology_proposed", pipeline_id=req.pipeline_id)
         return {"proposals": proposals, "count": len(proposals)}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -306,7 +332,7 @@ async def get_proposal(proposal_id: str):
 
 
 @router.post("/proposal/{proposal_id}/review")
-async def review_proposal(proposal_id: str, req: ReviewProposalRequest):
+async def review_proposal(proposal_id: str, req: ReviewProposalRequest, _key: str = Depends(require_role("admin"))):
     storage = _storage()
     manager = OntologyManager(storage)
 

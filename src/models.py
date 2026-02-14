@@ -209,6 +209,39 @@ class Connection(Base):
         return d
 
 
+class PlatformEvent(Base):
+    __tablename__ = "platform_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_type = Column(String, nullable=False, index=True)
+    pipeline_id = Column(String, nullable=True, index=True)
+    entity_name = Column(String, nullable=True)
+    run_id = Column(String, nullable=True)
+    user_key_prefix = Column(String, nullable=True)
+    metadata_json = Column(Text, default="{}")
+    created_at = Column(String, nullable=False)
+
+    @property
+    def event_metadata(self) -> dict:
+        return json.loads(self.metadata_json) if self.metadata_json else {}
+
+    @event_metadata.setter
+    def event_metadata(self, value: dict):
+        self.metadata_json = json.dumps(value)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "event_type": self.event_type,
+            "pipeline_id": self.pipeline_id,
+            "entity_name": self.entity_name,
+            "run_id": self.run_id,
+            "user_key_prefix": self.user_key_prefix,
+            "metadata": self.event_metadata,
+            "created_at": self.created_at,
+        }
+
+
 class APIKey(Base):
     __tablename__ = "api_keys"
 
@@ -217,8 +250,20 @@ class APIKey(Base):
     key_prefix = Column(String, nullable=False)  # First 12 chars for display
     name = Column(String, nullable=False)
     description = Column(String, default="")
+    role = Column(String, default="writer")
     active = Column(Boolean, default=True)
     created_at = Column(String, nullable=False)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "key_prefix": self.key_prefix,
+            "name": self.name,
+            "description": self.description,
+            "role": self.role,
+            "active": self.active,
+            "created_at": self.created_at,
+        }
 
 
 # ------------------------------------------------------------------

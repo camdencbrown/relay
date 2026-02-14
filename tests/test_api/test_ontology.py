@@ -539,6 +539,23 @@ def test_ontology_snapshot_after_creation(client):
 # ------------------------------------------------------------------
 
 
+def test_lineage_endpoint(client):
+    pipe_id = _create_pipeline(client, "Lineage Orders")
+    _create_entity(client, "lineage_entity", pipe_id)
+
+    resp = client.get("/api/v1/ontology/lineage/lineage_entity")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["entity"]["name"] == "lineage_entity"
+    assert data["pipeline"]["id"] == pipe_id
+    assert data["source"]["type"] == "csv_url"
+
+
+def test_lineage_not_found(client):
+    resp = client.get("/api/v1/ontology/lineage/nonexistent")
+    assert resp.status_code == 404
+
+
 def test_capabilities_includes_ontology(client):
     resp = client.get("/api/v1/capabilities")
     assert resp.status_code == 200

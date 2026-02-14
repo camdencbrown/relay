@@ -4,6 +4,8 @@ Relay API routes
 
 from fastapi import APIRouter
 
+from .admin import router as admin_router
+from .analytics import router as analytics_router
 from .capabilities import router as capabilities_router
 from .connections import router as connections_router
 from .metadata import router as metadata_router
@@ -22,3 +24,5 @@ api_router.include_router(metadata_router)
 api_router.include_router(search_router)
 api_router.include_router(transformations_router)
 api_router.include_router(ontology_router)
+api_router.include_router(analytics_router)
+api_router.include_router(admin_router)

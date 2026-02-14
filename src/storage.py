@@ -10,6 +10,7 @@ from typing import Dict, List, Optional
 from .database import get_db
 from .encryption import encrypt_dict
 from .models import (
+    APIKey,
     ColumnKnowledge,
     Connection,
     DatasetMetadata,
@@ -20,6 +21,7 @@ from .models import (
     OntologyRelationship,
     Pipeline,
     PipelineRun,
+    PlatformEvent,
 )
 
 
@@ -591,9 +593,106 @@ class Storage:
     # ------------------------------------------------------------------
 
     def get_ontology_snapshot(self) -> Dict:
+        entities = self.list_entities(status="active")
+        relationships = self.list_relationships(status="active")
+
+        # Build lineage summary: entity→pipeline mapping and relationship graph
+        entity_pipeline_map = {e["name"]: e["pipeline_id"] for e in entities}
+        relationship_graph = [
+            {
+                "from": r["from_entity"],
+                "to": r["to_entity"],
+                "type": r["relationship_type"],
+                "name": r["name"],
+            }
+            for r in relationships
+        ]
+
         return {
-            "entities": self.list_entities(status="active"),
-            "relationships": self.list_relationships(status="active"),
+            "entities": entities,
+            "relationships": relationships,
             "metrics": self.list_metrics(status="active"),
             "dimensions": self.list_dimensions(status="active"),
+            "lineage_summary": {
+                "entity_pipeline_map": entity_pipeline_map,
+                "relationship_graph": relationship_graph,
+            },
         }
+
+    # ------------------------------------------------------------------
+    # Platform Analytics
+    # ------------------------------------------------------------------
+
+    def record_event(
+        self,
+        event_type: str,
+        pipeline_id: str = None,
+        entity_name: str = None,
+        run_id: str = None,
+        user_key_prefix: str = None,
+        metadata: Dict = None,
+    ) -> Dict:
+        now = datetime.now(timezone.utc).isoformat()
+        with get_db() as db:
+            row = PlatformEvent(
+                event_type=event_type,
+                pipeline_id=pipeline_id,
+                entity_name=entity_name,
+                run_id=run_id,
+                user_key_prefix=user_key_prefix,
+                created_at=now,
+            )
+            row.event_metadata = metadata or {}
+            db.add(row)
+            db.flush()
+            return row.to_dict()
+
+    def list_events(
+        self, event_type: str = None, pipeline_id: str = None, limit: int = 100
+    ) -> List[Dict]:
+        with get_db() as db:
+            q = db.query(PlatformEvent)
+            if event_type:
+                q = q.filter(PlatformEvent.event_type == event_type)
+            if pipeline_id:
+                q = q.filter(PlatformEvent.pipeline_id == pipeline_id)
+            rows = q.order_by(PlatformEvent.id.desc()).limit(limit).all()
+            return [r.to_dict() for r in rows]
+
+    def get_analytics_summary(self) -> Dict:
+        with get_db() as db:
+            from sqlalchemy import func
+
+            counts = (
+                db.query(PlatformEvent.event_type, func.count(PlatformEvent.id))
+                .group_by(PlatformEvent.event_type)
+                .all()
+            )
+            recent = (
+                db.query(PlatformEvent)
+                .order_by(PlatformEvent.id.desc())
+                .limit(50)
+                .all()
+            )
+            return {
+                "event_counts": {t: c for t, c in counts},
+                "total_events": sum(c for _, c in counts),
+                "recent_events": [r.to_dict() for r in recent],
+            }
+
+    # ------------------------------------------------------------------
+    # API Key Management
+    # ------------------------------------------------------------------
+
+    def list_api_keys(self) -> List[Dict]:
+        with get_db() as db:
+            rows = db.query(APIKey).order_by(APIKey.id).all()
+            return [r.to_dict() for r in rows]
+
+    def deactivate_api_key(self, key_id: int) -> bool:
+        with get_db() as db:
+            row = db.query(APIKey).filter(APIKey.id == key_id).first()
+            if not row:
+                return False
+            row.active = False
+            return True

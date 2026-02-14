@@ -17,7 +17,7 @@ async def get_capabilities():
         "design_principle": "Agent reads once, understands forever",
         "query_engine": {
             "engine": "DuckDB",
-            "description": "In-memory SQL execution over S3 parquet files",
+            "description": "In-memory SQL execution over S3 or local parquet files",
             "supported_features": [
                 "Multi-table JOINs (INNER, LEFT, RIGHT, OUTER)",
                 "Common Table Expressions (CTEs/WITH clauses)",
@@ -59,6 +59,12 @@ async def get_capabilities():
             "connection_update": "PUT /api/v1/connection/{id}",
             "connection_delete": "DELETE /api/v1/connection/{id}",
             "connection_test": "POST /api/v1/connection/{id}/test",
+            "analytics_summary": "GET /api/v1/analytics/summary",
+            "analytics_events": "GET /api/v1/analytics/events",
+            "lineage": "GET /api/v1/ontology/lineage/{entity_name}",
+            "admin_create_key": "POST /api/v1/admin/api-keys",
+            "admin_list_keys": "GET /api/v1/admin/api-keys",
+            "admin_deactivate_key": "DELETE /api/v1/admin/api-keys/{id}",
         },
         "sources": [
             {"type": "csv_url", "description": "Fetch CSV from public URL"},
@@ -77,7 +83,15 @@ async def get_capabilities():
                     "bucket": "S3 bucket name",
                     "path": "Path within bucket",
                 },
-            }
+            },
+            {
+                "type": "local",
+                "description": "Local disk storage (set STORAGE_MODE=local)",
+                "parameters": {
+                    "bucket": "Logical bucket name (becomes directory)",
+                    "path": "Path within bucket",
+                },
+            },
         ],
         "connections": {
             "description": "Named, encrypted credential stores. Create once, reference by name in pipelines.",
@@ -117,6 +131,58 @@ async def get_capabilities():
             "intervals": ["hourly", "daily", "weekly", "custom"],
             "example": {"schedule": {"enabled": True, "interval": "daily", "timezone": "UTC"}},
         },
+        "analytics": {
+            "description": "Platform usage tracking. Proves value by recording events for pipelines, queries, and ontology operations.",
+            "endpoints": {
+                "summary": "GET /api/v1/analytics/summary",
+                "events": "GET /api/v1/analytics/events?event_type=&pipeline_id=&limit=",
+            },
+            "tracked_events": [
+                "pipeline_created", "pipeline_run_started", "pipeline_deleted",
+                "query_executed", "entity_created", "metric_created",
+                "dimension_created", "semantic_query_executed", "ontology_proposed",
+            ],
+        },
+        "storage": {
+            "description": "Configurable storage backend for pipeline output files.",
+            "modes": {
+                "s3": "Write parquet files to AWS S3 (default, requires AWS credentials)",
+                "local": "Write parquet files to local disk (set STORAGE_MODE=local for zero-config demos)",
+            },
+            "configuration": {
+                "STORAGE_MODE": "s3 or local (default: s3)",
+                "LOCAL_STORAGE_PATH": "Directory for local mode (default: ./relay_data)",
+            },
+        },
+        "lineage": {
+            "description": "Entity→pipeline→source traceability. Read-only computed view.",
+            "endpoint": "GET /api/v1/ontology/lineage/{entity_name}",
+            "returns": [
+                "entity details",
+                "pipeline info (id, name, type, status)",
+                "source configuration",
+                "metrics with column_references",
+                "dimensions with column_references",
+                "relationships (outgoing, incoming)",
+                "downstream_entities and upstream_entities",
+            ],
+        },
+        "auth": {
+            "description": "Role-based access control (RBAC) with reader < writer < admin hierarchy.",
+            "roles": {
+                "reader": "Read-only access to all GET endpoints",
+                "writer": "Create and modify pipelines, connections, ontology objects",
+                "admin": "Delete operations, API key management, proposal review",
+            },
+            "configuration": {
+                "REQUIRE_AUTH": "Set to true to enforce API key authentication (default: false)",
+            },
+            "endpoints": {
+                "create_key": "POST /api/v1/admin/api-keys (admin only)",
+                "list_keys": "GET /api/v1/admin/api-keys (admin only)",
+                "deactivate_key": "DELETE /api/v1/admin/api-keys/{id} (admin only)",
+            },
+        },
         "ontology": {
             "description": "Semantic ontology layer: named entities, relationships, metrics, and dimensions. "
             "Agents both consume and build the ontology.",
@@ -140,6 +206,7 @@ async def get_capabilities():
                     "3. POST /ontology/proposal/{id}/review to approve or reject",
                     "4. GET /ontology to see the full active ontology",
                     "5. POST /ontology/query to run semantic queries",
+                    "6. GET /ontology/lineage/{entity_name} to trace entity lineage",
                 ],
             },
             "endpoints": {
@@ -166,6 +233,7 @@ async def get_capabilities():
                 "proposal_list": "GET /api/v1/ontology/proposal/list",
                 "proposal_get": "GET /api/v1/ontology/proposal/{id}",
                 "proposal_review": "POST /api/v1/ontology/proposal/{id}/review",
+                "lineage": "GET /api/v1/ontology/lineage/{entity_name}",
             },
         },
         "getting_started": [
@@ -175,5 +243,7 @@ async def get_capabilities():
             "4. Create pipeline: POST /pipeline/create (use connection name or inline credentials)",
             "5. Run pipeline: POST /pipeline/{id}/run",
             "6. Query data: POST /query (raw SQL) or POST /ontology/query (semantic)",
+            "7. View lineage: GET /ontology/lineage/{entity_name}",
+            "8. View analytics: GET /analytics/summary",
         ],
     }

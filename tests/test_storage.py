@@ -599,6 +599,39 @@ def test_update_proposal(storage):
 # ------------------------------------------------------------------
 
 
+def test_record_and_list_events(storage):
+    storage.record_event("pipeline_created", pipeline_id="pipe-1")
+    storage.record_event("pipeline_run_started", pipeline_id="pipe-1", run_id="run-1")
+    storage.record_event("query_executed", metadata={"row_count": 42})
+
+    events = storage.list_events()
+    assert len(events) == 3
+
+
+def test_filter_events(storage):
+    storage.record_event("pipeline_created", pipeline_id="pipe-1")
+    storage.record_event("query_executed")
+    storage.record_event("pipeline_created", pipeline_id="pipe-2")
+
+    created = storage.list_events(event_type="pipeline_created")
+    assert len(created) == 2
+
+    pipe1 = storage.list_events(pipeline_id="pipe-1")
+    assert len(pipe1) == 1
+
+
+def test_analytics_summary(storage):
+    storage.record_event("pipeline_created", pipeline_id="pipe-1")
+    storage.record_event("pipeline_created", pipeline_id="pipe-2")
+    storage.record_event("query_executed")
+
+    summary = storage.get_analytics_summary()
+    assert summary["total_events"] == 3
+    assert summary["event_counts"]["pipeline_created"] == 2
+    assert summary["event_counts"]["query_executed"] == 1
+    assert len(summary["recent_events"]) == 3
+
+
 def test_ontology_snapshot(storage):
     storage.save_entity({
         "id": "ent-snap",
@@ -628,3 +661,9 @@ def test_ontology_snapshot(storage):
     assert len(snapshot["metrics"]) == 1
     assert len(snapshot["relationships"]) == 0
     assert len(snapshot["dimensions"]) == 0
+
+    # Lineage summary
+    assert "lineage_summary" in snapshot
+    ls = snapshot["lineage_summary"]
+    assert ls["entity_pipeline_map"]["orders"] == "pipe-1"
+    assert ls["relationship_graph"] == []

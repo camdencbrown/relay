@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
-from ..auth import require_api_key
+from ..auth import require_role
 from ..pipeline import PipelineEngine
 from ..schemas import CreatePipelineRequest, PipelineOptions, ScheduleConfig, TestSourceRequest
 from ..storage import Storage
@@ -31,7 +31,7 @@ def get_engine() -> PipelineEngine:
 @router.post("/pipeline/create")
 async def create_pipeline(
     request: CreatePipelineRequest,
-    _key: str = Depends(require_api_key),
+    _key: str = Depends(require_role("writer")),
 ):
     try:
         pipeline_id = f"pipe-{uuid.uuid4().hex[:8]}"
@@ -51,6 +51,7 @@ async def create_pipeline(
         }
 
         _storage.save_pipeline(pipeline)
+        _storage.record_event("pipeline_created", pipeline_id=pipeline_id)
         table_name = sanitize_table_name(request.name)
 
         return {
@@ -137,7 +138,7 @@ async def get_pipeline(pipeline_id: str):
 async def run_pipeline(
     pipeline_id: str,
     background_tasks: BackgroundTasks,
-    _key: str = Depends(require_api_key),
+    _key: str = Depends(require_role("writer")),
 ):
     pipeline = _storage.get_pipeline(pipeline_id)
     if not pipeline:
@@ -148,6 +149,7 @@ async def run_pipeline(
 
     run_id = f"run-{uuid.uuid4().hex[:8]}"
     background_tasks.add_task(_engine.execute_pipeline, pipeline_id, run_id)
+    _storage.record_event("pipeline_run_started", pipeline_id=pipeline_id, run_id=run_id)
 
     return {
         "status": "started",
@@ -183,7 +185,7 @@ async def get_run_status(pipeline_id: str, run_id: str):
 @router.delete("/pipeline/{pipeline_id}")
 async def delete_pipeline(
     pipeline_id: str,
-    _key: str = Depends(require_api_key),
+    _key: str = Depends(require_role("admin")),
 ):
     pipeline = _storage.get_pipeline(pipeline_id)
     if not pipeline:
@@ -192,6 +194,7 @@ async def delete_pipeline(
             detail={"status": "not_found", "message": f"Pipeline {pipeline_id} not found"},
         )
     _storage.delete_pipeline(pipeline_id)
+    _storage.record_event("pipeline_deleted", pipeline_id=pipeline_id)
     return {
         "status": "deleted",
         "pipeline_id": pipeline_id,

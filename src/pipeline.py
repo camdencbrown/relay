@@ -11,7 +11,9 @@ from typing import Dict
 
 import pandas as pd
 
+from .config import get_settings
 from .connectors import ConnectorRegistry
+from .file_storage import write_file
 from .metadata import MetadataGenerator
 from .s3 import get_s3_client
 from .storage import Storage
@@ -24,7 +26,7 @@ class PipelineEngine:
 
     def __init__(self, storage: Storage):
         self.storage = storage
-        self.s3_client = get_s3_client()
+        self.s3_client = get_s3_client() if get_settings().storage_mode == "s3" else None
 
         # Lazy imports to avoid circular dependencies at module level
         from .ai_semantics import AISemantics
@@ -214,8 +216,7 @@ class PipelineEngine:
         content = buffer.getvalue()
         if isinstance(content, str):
             content = content.encode()
-        self.s3_client.put_object(Bucket=bucket, Key=s3_key, Body=content)
-        return f"s3://{bucket}/{s3_key}"
+        return write_file(content, bucket, s3_key, s3_client=self.s3_client)
 
     @staticmethod
     def _set_duration(run: Dict) -> None:

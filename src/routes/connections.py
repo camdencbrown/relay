@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..auth import require_api_key
+from ..auth import require_role
 from ..connectors import ConnectorRegistry
 from ..schemas import CreateConnectionRequest, UpdateConnectionRequest
 from ..storage import Storage
@@ -21,7 +21,7 @@ def _conn_id() -> str:
 
 
 @router.post("/connection/create")
-async def create_connection(req: CreateConnectionRequest, _key: str = Depends(require_api_key)):
+async def create_connection(req: CreateConnectionRequest, _key: str = Depends(require_role("writer"))):
     """Create a named, encrypted connection."""
     existing = storage.get_connection_by_name(req.name)
     if existing:
@@ -57,7 +57,7 @@ async def get_connection(connection_id: str):
 
 @router.put("/connection/{connection_id}")
 async def update_connection(
-    connection_id: str, req: UpdateConnectionRequest, _key: str = Depends(require_api_key)
+    connection_id: str, req: UpdateConnectionRequest, _key: str = Depends(require_role("writer"))
 ):
     """Update connection description or credentials."""
     existing = storage.get_connection(connection_id)
@@ -78,7 +78,7 @@ async def update_connection(
 
 
 @router.delete("/connection/{connection_id}")
-async def delete_connection(connection_id: str, _key: str = Depends(require_api_key)):
+async def delete_connection(connection_id: str, _key: str = Depends(require_role("admin"))):
     """Delete a connection. Blocked if pipelines reference it."""
     conn = storage.get_connection(connection_id)
     if not conn:
@@ -97,7 +97,7 @@ async def delete_connection(connection_id: str, _key: str = Depends(require_api_
 
 
 @router.post("/connection/{connection_id}/test")
-async def test_connection(connection_id: str, _key: str = Depends(require_api_key)):
+async def test_connection(connection_id: str, _key: str = Depends(require_role("writer"))):
     """Test a connection's connectivity."""
     conn = storage.get_connection(connection_id, include_credentials=True)
     if not conn:

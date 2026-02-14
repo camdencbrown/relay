@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite:///relay.db"
 
+    # Storage
+    storage_mode: str = "s3"  # "s3" or "local"
+    local_storage_path: str = "./relay_data"
+
     # AWS / S3
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""

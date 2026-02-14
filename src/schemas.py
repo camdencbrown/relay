@@ -223,3 +223,23 @@ class ProposeOntologyRequest(BaseModel):
     pipeline_id: str = Field(..., description="Pipeline to analyze")
     include_relationships: bool = Field(default=True, description="Propose relationships to existing entities")
     include_metrics: bool = Field(default=True, description="Propose metrics and dimensions")
+
+
+# ------------------------------------------------------------------
+# Admin / RBAC schemas
+# ------------------------------------------------------------------
+
+VALID_ROLES = {"reader", "writer", "admin"}
+
+
+class CreateAPIKeyRequest(BaseModel):
+    name: str = Field(..., description="Name for the API key")
+    description: Optional[str] = Field(None, description="Optional description")
+    role: str = Field(default="writer", description="Role: reader, writer, or admin")
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        if v not in VALID_ROLES:
+            raise ValueError(f"Invalid role '{v}'. Must be one of: {sorted(VALID_ROLES)}")
+        return v
