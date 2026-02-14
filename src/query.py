@@ -32,12 +32,16 @@ class QueryEngine:
         if settings.storage_mode == "s3":
             s3_cfg = get_duckdb_s3_config()
             if s3_cfg:
+                session_token_line = ""
+                if s3_cfg.get("session_token"):
+                    session_token_line = f"SESSION_TOKEN '{s3_cfg['session_token']}',"
                 conn.execute(
                     f"""
                     CREATE SECRET secret1 (
                         TYPE S3,
                         KEY_ID '{s3_cfg["key_id"]}',
                         SECRET '{s3_cfg["secret"]}',
+                        {session_token_line}
                         REGION '{s3_cfg["region"]}'
                     );
                     """
